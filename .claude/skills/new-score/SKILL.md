@@ -1,6 +1,7 @@
 ---
 name: new-score
 description: Add a new score to the choir practice site from a MuseScore .mscz file. Exports PDF + full/per-part MP3s via the MuseScore CLI, creates the piece folder, sets set/tags, builds and uploads videos. Use for /new-score.
+user-invocable: true
 ---
 
 # /new-score
