@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """Export full + per-part MP3s and PDFs from an .mscz via MuseScore CLI.
 Usage: export.py <file.mscz> <outdir> [--mscore PATH]
-Per-part audio: temp copy with other parts' notes set to play=0, then exports MP3.
-Per-part PDFs: only if the score has Parts (-P)."""
+Per-part audio: temp copy with other parts' notes set to play=0, then exports MP3."""
 import json, os, re, shutil, subprocess, sys, tempfile, zipfile
 import xml.etree.ElementTree as ET
 
@@ -48,11 +47,5 @@ for name in parts:
                 full = os.path.join(r, f); z.write(full, os.path.relpath(full, ex))
     run('-o', f'{out}/{name}.mp3', tmpz)
     zipfile.ZipFile(src).extract(mscx_name, ex)
-pdir = os.path.join(tmp, 'pp'); os.makedirs(pdir)
-try: run('-P', '-o', f'{pdir}/p.pdf', src)
-except Exception: pass
-for f in os.listdir(pdir):
-    m = re.match(r'p-(.+)\.pdf$', f)
-    if m and slug(m.group(1)) in parts: shutil.copy(os.path.join(pdir, f), f'{out}/{slug(m.group(1))}.pdf')
 print(json.dumps({'parts': parts}))
 shutil.rmtree(tmp)

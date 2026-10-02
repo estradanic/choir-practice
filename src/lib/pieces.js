@@ -32,7 +32,7 @@ export function getPieces() {
           key: n,
           label: cap(n),
           audio: has(`${n}.mp3`) ? `${n}.mp3` : null,
-          pdf: has(`${n}.pdf`) ? `${n}.pdf` : null,
+          pdf: has('score.pdf') ? 'score.pdf' : null,
           video: vid(n),
         }));
       const full = {
