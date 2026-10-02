@@ -8,19 +8,31 @@ const { title } = Astro.props;
     <meta name="robots" content="noindex, nofollow" />
     <title>{title}</title>
     <style is:global>
-      body { font-family: system-ui, sans-serif; max-width: 42rem; margin: 0 auto; padding: 1rem; line-height: 1.5; color: #222; }
-      a { color: #1a56b0; }
-      nav.tabs { display: flex; flex-wrap: wrap; gap: .5rem; margin: 1rem 0; }
-      nav.tabs button { font: inherit; padding: .75rem 1.1rem; border: 2px solid #1a56b0; background: #fff; color: #1a56b0; border-radius: .5rem; cursor: pointer; }
-      nav.tabs button[aria-selected=true] { background: #1a56b0; color: #fff; }
-      audio { width: 100%; margin: .5rem 0; }
-      .video { display: block; width: 100%; max-width: 480px; margin: 0 auto; aspect-ratio: 832/1078; background: #000; }
-      details summary { cursor: pointer; margin: .5rem 0; }
-      object.pdf { width: 100%; height: 75vh; border: 1px solid #ddd; margin: .5rem 0; }
-            .btn { display: inline-block; padding: .75rem 1.1rem; border: 2px solid #1a56b0; border-radius: .5rem; text-decoration: none; margin: .25rem 0; }
-      ul.list { list-style: none; padding: 0; }
-      ul.list li { padding: .75rem 0; border-bottom: 1px solid #ddd; }
-      ul.list a { font-size: 1.15rem; }
+      :root { --face: #d4d0c8; --hi: #fff; --mid: #808080; --dark: #404040; --navy: #0a246a; --raised: inset -1px -1px var(--dark), inset 1px 1px var(--hi), inset -2px -2px var(--mid), inset 2px 2px var(--face); --sunken: inset 1px 1px var(--mid), inset -1px -1px var(--hi), inset 2px 2px var(--dark), inset -2px -2px var(--face); }
+      html { background: #c0c0c0; }
+      body { font: 13px/1.45 Tahoma, Verdana, "Segoe UI", Arial, sans-serif; max-width: 44rem; margin: 12px auto; padding: 0 8px 8px; background: var(--face); color: #000; box-shadow: var(--raised), 2px 2px 0 #000; }
+      @media (min-width: 600px) { body { font-size: 14px; } }
+      h1 { margin: 0 -8px 8px; padding: 4px 8px; font-size: 1.1rem; color: #fff; background: linear-gradient(90deg, var(--navy), #a6caf0); }
+      h2 { font-size: 1rem; margin: 12px 0 4px; }
+      a { color: #0000ee; }
+      small { color: #333; }
+      button, .btn { font: inherit; color: #000; background: var(--face); border: 0; padding: 5px 14px; box-shadow: var(--raised); cursor: pointer; text-decoration: none; display: inline-block; }
+      button:active, .btn:active { box-shadow: var(--sunken); padding: 6px 13px 4px 15px; }
+      button:focus-visible, .btn:focus-visible, summary:focus-visible { outline: 1px dotted #000; outline-offset: -4px; }
+      nav.tabs { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0; }
+      nav.tabs button[aria-selected=true] { box-shadow: var(--sunken); font-weight: bold; background: #e8e6e0; }
+      input[type=search] { font: inherit; background: #fff; border: 0; box-shadow: var(--sunken); padding: 5px 6px; }
+      audio { width: 100%; display: block; }
+      .video { display: block; width: 100%; max-width: 480px; margin: 0 auto; aspect-ratio: 832/1078; background: #000; box-shadow: var(--sunken); }
+      .box { margin: 12px 0; padding: 0 0 8px; box-shadow: var(--raised); background: var(--face); }
+      .box > * { margin-left: 8px; margin-right: 8px; }
+      .box > h2 { margin: 0 0 8px; padding: 3px 8px; font-size: 1rem; color: #fff; background: linear-gradient(90deg, var(--navy), #a6caf0); }
+      .actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; margin-bottom: 0; padding-top: 8px; border-top: 1px solid var(--mid); box-shadow: 0 1px 0 var(--hi) inset; }
+      details summary { cursor: pointer; padding: 2px 0; }
+      object.pdf { width: 100%; height: 75vh; box-shadow: var(--sunken); background: #fff; margin: 6px 0; }
+      ul.list { list-style: none; padding: 0; margin: 0; background: #fff; box-shadow: var(--sunken); }
+      ul.list li { padding: 6px 8px; border-bottom: 1px dotted var(--mid); }
+      ul.list a { font-size: 1.05rem; }
       [hidden] { display: none !important; }
     </style>
   </head>

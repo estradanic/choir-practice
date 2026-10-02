@@ -16,7 +16,7 @@ const groups = [...sets.entries()]
 ---
 <Layout title="Choir Practice">
   <h1>Choir Practice</h1>
-  <input type="search" data-search placeholder="Search title, composer, set…" aria-label="Search pieces" />
+  <input type="search" data-search style="width:100%;box-sizing:border-box;margin:4px 0" placeholder="Search title, composer, set…" aria-label="Search pieces" />
   {tags.length > 0 && (
     <nav class="tabs" aria-label="Filter by tag">
       <button data-filter="" aria-selected="true">All</button>
@@ -59,6 +59,3 @@ const groups = [...sets.entries()]
   }));
   input?.addEventListener('input', apply);
 </script>
-<style>
-  [data-search] { width: 100%; box-sizing: border-box; font: inherit; padding: .6rem .8rem; margin: .5rem 0 .25rem; border: 2px solid #1a56b0; border-radius: .5rem; }
-</style>
