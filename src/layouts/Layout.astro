@@ -13,6 +13,9 @@ const { title } = Astro.props;
       body { font: 13px/1.45 Tahoma, Verdana, "Segoe UI", Arial, sans-serif; max-width: 44rem; margin: 12px auto; padding: 2px 8px 8px; background: var(--face); color: #000; box-shadow: var(--raised), 2px 2px 0 #000; }
       @media (min-width: 600px) { body { font-size: 14px; } }
       h1 { margin: 2px -6px 8px; padding: 4px 8px; font-size: 1.1rem; color: #fff; background: linear-gradient(90deg, var(--navy), #a6caf0); }
+      .titlebar { display: flex; align-items: center; gap: 8px; margin: 2px -6px 8px; padding: 2px 4px 2px 8px; background: linear-gradient(90deg, var(--navy), #a6caf0); }
+      .titlebar h1 { flex: 1; margin: 0; padding: 0; background: none; min-width: 0; }
+      .titlebar .btn { padding: 1px 8px; font-size: 12px; white-space: nowrap; }
       h2 { font-size: 1rem; margin: 12px 0 4px; }
       a { color: #0000ee; }
       small { color: #333; }
