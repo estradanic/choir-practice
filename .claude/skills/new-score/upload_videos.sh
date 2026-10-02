@@ -7,4 +7,9 @@ set -a; source .env; set +a
 export RCLONE_CONFIG_R2_TYPE=s3 RCLONE_CONFIG_R2_PROVIDER=Cloudflare \
   RCLONE_CONFIG_R2_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID" RCLONE_CONFIG_R2_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY" \
   RCLONE_CONFIG_R2_ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
-rclone copy "video-out/$slug" "R2:${R2_BUCKET}/$slug" --progress --header-upload "Content-Type: video/mp4" --header-upload "Cache-Control: public, max-age=31536000"
+for f in "video-out/$slug"/*.mp4; do
+  name=$(basename "$f")
+  rclone copyto --ignore-times "$f" "R2:${R2_BUCKET}/$slug/$name" --header-upload "Content-Type: video/mp4" \
+    --header-upload "Cache-Control: public, max-age=31536000" \
+    --header-upload "Content-Disposition: attachment; filename=\"${slug}-${name}\""
+done
