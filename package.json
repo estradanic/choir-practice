@@ -1,0 +1,11 @@
+{
+  "name": "choir-practice",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "new-piece": "node scripts/new-piece.mjs"
+  },
+  "dependencies": { "astro": "^5.0.0" }
+}

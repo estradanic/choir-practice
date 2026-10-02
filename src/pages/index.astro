@@ -1,0 +1,51 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { getPieces } from '../lib/pieces.js';
+const pieces = getPieces();
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const tags = [...new Set(pieces.flatMap((p) => p.tags))].sort();
+const sets = new Map();
+for (const p of pieces) {
+  const k = p.set || '';
+  if (!sets.has(k)) sets.set(k, []);
+  sets.get(k).push(p);
+}
+const groups = [...sets.entries()]
+  .map(([name, items]) => ({ name, items: items.sort((a, b) => a.setOrder - b.setOrder || a.title.localeCompare(b.title)) }))
+  .sort((a, b) => (a.name ? 0 : 1) - (b.name ? 0 : 1) || a.name.localeCompare(b.name));
+---
+<Layout title="Choir Practice">
+  <h1>Choir Practice</h1>
+  {tags.length > 0 && (
+    <nav class="tabs" aria-label="Filter by tag">
+      <button data-filter="" aria-selected="true">All</button>
+      {tags.map((t) => <button data-filter={t} aria-selected="false">{t}</button>)}
+    </nav>
+  )}
+  {groups.map((g) => (
+    <section data-group>
+      {g.name && <h2>{g.name}</h2>}
+      <ul class="list">
+        {g.items.map((p) => (
+          <li data-tags={JSON.stringify(p.tags)}>
+            <a href={`${base}/pieces/${p.slug}/`}>{p.title}</a><br />
+            <small>{[p.composer, ...p.tags].filter(Boolean).join(' · ')}</small>
+          </li>
+        ))}
+      </ul>
+    </section>
+  ))}
+</Layout>
+<script>
+  const btns = document.querySelectorAll('[data-filter]');
+  btns.forEach((b) => b.addEventListener('click', () => {
+    const f = (b as HTMLElement).dataset.filter;
+    btns.forEach((x) => x.setAttribute('aria-selected', String(x === b)));
+    document.querySelectorAll('li[data-tags]').forEach((li) => {
+      (li as HTMLElement).hidden = !!f && !JSON.parse((li as HTMLElement).dataset.tags!).includes(f);
+    });
+    document.querySelectorAll('[data-group]').forEach((g) => {
+      (g as HTMLElement).hidden = ![...g.querySelectorAll('li')].some((li) => !li.hidden);
+    });
+  }));
+</script>

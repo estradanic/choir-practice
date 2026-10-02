@@ -1,0 +1,39 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { getPieces } from '../../lib/pieces.js';
+export function getStaticPaths() {
+  return getPieces().map((p) => ({ params: { slug: p.slug }, props: { piece: p } }));
+}
+const { piece } = Astro.props;
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const file = (f) => `${base}/pieces/${piece.slug}/${f}`;
+---
+<Layout title={piece.title}>
+  <p><a href={`${base}/`}>← All pieces</a></p>
+  <h1>{piece.title}</h1>
+  <p>{piece.composer}</p>
+  <nav class="tabs" role="tablist">
+    {piece.tracks.map((t, i) => (
+      <button role="tab" data-tab={t.key} aria-selected={i === 0 ? 'true' : 'false'}>{t.label}</button>
+    ))}
+  </nav>
+  {piece.tracks.map((t, i) => (
+    <section data-panel={t.key} hidden={i !== 0}>
+      <h2>{t.label}</h2>
+      {t.audio && <audio controls preload="none" src={file(t.audio)}></audio>}
+      {t.pdf && <p><a class="btn" href={file(t.pdf)} target="_blank">Open {t.label} score (PDF)</a></p>}
+      {t.video && <video class="video" controls playsinline preload="metadata" src={t.video}></video>}
+    </section>
+  ))}
+</Layout>
+<script>
+  const tabs = document.querySelectorAll('[data-tab]');
+  const panels = document.querySelectorAll('[data-panel]');
+  tabs.forEach((tab) => tab.addEventListener('click', () => {
+    tabs.forEach((x) => x.setAttribute('aria-selected', String(x === tab)));
+    panels.forEach((p) => {
+      p.hidden = p.dataset.panel !== tab.dataset.tab;
+      if (p.hidden) p.querySelectorAll('audio, video').forEach((a) => a.pause());
+    });
+  }));
+</script>

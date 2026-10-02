@@ -1,0 +1,26 @@
+---
+const { title } = Astro.props;
+---
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>{title}</title>
+    <style is:global>
+      body { font-family: system-ui, sans-serif; max-width: 42rem; margin: 0 auto; padding: 1rem; line-height: 1.5; color: #222; }
+      a { color: #1a56b0; }
+      nav.tabs { display: flex; flex-wrap: wrap; gap: .5rem; margin: 1rem 0; }
+      nav.tabs button { font: inherit; padding: .75rem 1.1rem; border: 2px solid #1a56b0; background: #fff; color: #1a56b0; border-radius: .5rem; cursor: pointer; }
+      nav.tabs button[aria-selected=true] { background: #1a56b0; color: #fff; }
+      audio { width: 100%; margin: .5rem 0; }
+      .video { width: 100%; aspect-ratio: 16/9; background: #000; }
+            .btn { display: inline-block; padding: .75rem 1.1rem; border: 2px solid #1a56b0; border-radius: .5rem; text-decoration: none; margin: .25rem 0; }
+      ul.list { list-style: none; padding: 0; }
+      ul.list li { padding: .75rem 0; border-bottom: 1px solid #ddd; }
+      ul.list a { font-size: 1.15rem; }
+      [hidden] { display: none !important; }
+    </style>
+  </head>
+  <body><slot /></body>
+</html>
