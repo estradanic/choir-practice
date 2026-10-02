@@ -20,9 +20,30 @@ const file = (f) => `${base}/pieces/${piece.slug}/${f}`;
   {piece.tracks.map((t, i) => (
     <section data-panel={t.key} hidden={i !== 0}>
       <h2>{t.label}</h2>
-      {t.audio && <audio controls preload="none" src={file(t.audio)}></audio>}
-      {t.pdf && <p><a class="btn" href={file(t.pdf)} target="_blank">Open {t.label} score (PDF)</a></p>}
-      {t.video && <video class="video" controls playsinline preload="metadata" src={t.video}></video>}
+      {t.audio && (
+        <div>
+          <audio controls preload="none" src={file(t.audio)}></audio>
+          <a class="btn" href={file(t.audio)} download={`${piece.slug}-${t.key}.mp3`}>Download audio</a>
+        </div>
+      )}
+      {t.pdf && (
+        <details>
+          <summary>View {t.label} score (PDF)</summary>
+          <object class="pdf" type="application/pdf" data={file(t.pdf)} aria-label={`${t.label} score`}>
+            <p>Your browser cannot display this PDF. <a href={file(t.pdf)}>Open it instead</a>.</p>
+          </object>
+          <p>
+            <a class="btn" href={file(t.pdf)} target="_blank" rel="noopener">Open in new tab</a>
+            <a class="btn" href={file(t.pdf)} download>Download PDF</a>
+          </p>
+        </details>
+      )}
+      {t.video && (
+        <div>
+          <video class="video" controls playsinline preload="metadata" src={t.video}></video>
+          <a class="btn" href={t.video} target="_blank" rel="noopener">Download video</a>
+        </div>
+      )}
     </section>
   ))}
 </Layout>
