@@ -21,16 +21,20 @@ const { title } = Astro.props;
       small { color: #333; }
       button, .btn { font: inherit; color: #000; background: var(--face); border: 0; padding: 5px 14px; box-shadow: var(--raised); cursor: pointer; text-decoration: none; display: inline-block; }
       button:active, .btn:active { box-shadow: var(--sunken); padding: 6px 13px 4px 15px; }
-      button:focus-visible, .btn:focus-visible, summary:focus-visible { outline: 1px dotted #000; outline-offset: -4px; }
+      button:focus-visible, .btn:focus-visible { outline: 1px dotted #000; outline-offset: -4px; }
       nav.tabs { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0; }
       nav.tabs button[aria-selected=true] { box-shadow: var(--sunken); font-weight: bold; background: #e8e6e0; }
       input[type=search] { font: inherit; background: #fff; border: 0; box-shadow: var(--sunken); padding: 5px 6px; }
       audio { width: 100%; display: block; }
       .video { display: block; width: 100%; max-width: 480px; margin: 0 auto; aspect-ratio: 832/1078; background: #000; box-shadow: var(--sunken); }
       .box { margin: 12px 0; padding: 2px 8px 8px; box-shadow: var(--raised); background: var(--face); }
-      .box > h2 { margin: 0 -6px 8px; padding: 3px 8px; font-size: 1rem; color: #fff; background: linear-gradient(90deg, var(--navy), #a6caf0); }
+      .box > h2 { display: flex; align-items: center; justify-content: space-between; margin: 0 -6px 8px; padding: 3px 8px; font-size: 1rem; color: #fff; background: linear-gradient(90deg, var(--navy), #a6caf0); }
       .actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; margin-bottom: 0; padding-top: 8px; border-top: 1px solid var(--mid); box-shadow: 0 1px 0 var(--hi) inset; }
-      details summary { cursor: pointer; padding: 2px 0; }
+      .min { position: relative; padding: 0; width: 22px; height: 20px; flex: none; }
+      .min::before { content: ""; position: absolute; box-sizing: border-box; background: #000; }
+      .min[aria-expanded=true]::before { left: 6px; bottom: 5px; width: 8px; height: 3px; }
+      .min[aria-expanded=false]::before { left: 6px; top: 5px; width: 9px; height: 8px; background: none; border: 1px solid #000; border-top-width: 2px; }
+      [hidden] { display: none !important; }
       object.pdf { width: 100%; height: 75vh; box-shadow: var(--sunken); background: #fff; margin: 6px 0; }
       ul.list { list-style: none; padding: 0; margin: 0; background: #fff; box-shadow: var(--sunken); }
       ul.list li { padding: 6px 8px; border-bottom: 1px dotted var(--mid); }
