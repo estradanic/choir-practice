@@ -10,21 +10,27 @@ Input: path to an `.mscz` file (ask if not given). Keep it token-cheap: run the 
 
 ## Steps
 
-1. **Ask (one question call)**: title, composer, set name (optional, plus position in the set), tags (offer existing ones: `grep -h '"tags"' public/pieces/*/piece.json`).
-2. **Create the piece**: `npm run new-piece "<Title>" "<Composer>"` → `public/pieces/<slug>/`.
+1. **Ask (one question call)**: title, composer, set name (optional, plus position in the set), tags (offer existing ones: `grep -h '"tags"' public/pieces/*/piece.json`), and **anything non-standard about the parts** — anything that is not standard SATB.
+   - Offer options like Descant, extra Soprano/Alto splits, Baritone, Bass II, doubling, a piano/organ part, or "standard SATB, nothing unusual".
+   - Compare with the score: `export.py` prints the parts it found. A part the user mentions but the export doesn't produce means the score is set up unusually — see Notes.
+   - Never rely on this alone: check the produced `<part>.mp3` names against what the user said and ask if they disagree.
+2. **Create the piece**: `npm run new-piece "<Title>" "<Composer>" "<Set>"` → `public/pieces/<slug>/`. Slug is always `title-composer-set` (empty parts omitted).
 3. **Export**: `python3 .claude/skills/new-score/export.py "<file.mscz>" public/pieces/<slug>`
-   - Produces `score.pdf`, `full.mp3`, and one `<part>.mp3` per part (only that part audible). Takes ~30s per 4-part piece.
+   - Produces `score.pdf`, `full.mp3`, and one `<part>.mp3` per part (only that part audible). Takes ~30s per part.
    - No part PDFs by design: everyone uses the same full score PDF.
    - Uses `mscore4portable` on PATH (override with `--mscore PATH`).
+   - Also writes `"parts": [...]` into `piece.json`: the parts in score staff order. Don't hand-edit it; re-run the export instead. The site lists tracks in that order, so no other file records voice order.
 4. **Edit `piece.json`**: set `title`, `composer`, `set`, `setOrder`, `tags`. Pieces sharing an identical `set` string are grouped on the home page.
 5. **Videos**: ask for the MuseScore-exported `.mp4` (video export is GUI-only; skip this step if none). Then:
    - `python3 .claude/skills/new-score/part_videos.py "<video.mp4>" public/pieces/<slug> video-out/<slug>` → `full.mp4` + `<part>.mp4` (auto-measures the ~2.98s intro offset; ~5s, video not re-encoded).
-   - `.claude/skills/new-score/upload_videos.sh <slug>` → uploads to the Cloudflare R2 bucket (needs rclone + `.env`, see `.env.example`; if missing, tell the user to follow README setup).
-   - In `piece.json` set `"videos": ["full", "soprano", ...]` (the tracks uploaded). URLs are derived as `<site.json videoBase>/<slug>/<track>.mp4`.
+   - `.claude/skills/new-score/upload_videos.sh <slug>` → uploads to the Cloudflare R2 bucket (needs rclone + `.env`, see `.env.example`; if missing, tell the user to follow README setup). The script passes `--s3-no-check-bucket`; without it every upload dies with `CreateBucket … 403 AccessDenied`, because R2 forbids bucket creation to a token scoped to that bucket.
+   - In `piece.json` set `"videos": ["full", "soprano", ...]` (the tracks uploaded). URLs are derived as `<site.json videoBase>/<slug>/<track>.mp4`. Only list tracks that actually uploaded, otherwise the tabs 404.
 6. **Verify**: `npm run build`; confirm it passes.
-7. **Offer to commit and push** (`git add public/pieces/<slug>`; message "Add <title>"). The GitHub Action deploys it.
+7. **Offer to commit and push** (`git add public/pieces/<slug>`; message "Add <title>"). Include any supporting changes made along the way (e.g. `.gitignore`, `scripts/new-piece.mjs`, `src/lib/pieces.js`, this skill). The GitHub Action deploys it.
 
 ## Notes
 - File naming rules: `score.pdf`, `full.mp3`, `<part>.mp3`. Parts are auto-detected from filenames; any names (e.g. `baritone`) work.
+- Voice order on the page is the score's staff order, read from `parts` in `piece.json` (written by `export.py`). `src/lib/pieces.js` only falls back to `soprano, alto, tenor, baritone, bass` for pieces exported before that existed, so don't add non-standard voices to that list.
+- Watch for parts whose `trackName` is duplicated or stale, e.g. a Descant copied from the Soprano and only the *instrument* renamed, leaving both parts called "Soprano". `export.py` disambiguates by preferring the instrument's `longName` when it is unique (so it exports `descant.mp3`), falling back to a numeric suffix (`soprano2`). If a part still looks wrong, inspect `trackName` vs `longName` per `Part` in the `.mscx`.
 - If an export errors, check that the AppImage runs: `mscore4portable --version`.
 - Per-part audio: a temp copy of the score has `<play>0</play>` set on every note outside the target part, then it is exported. (Soloing via `audiosettings.json` was tried first but leaked the soprano into the first ~20s of every part.) The original .mscz is never modified.
