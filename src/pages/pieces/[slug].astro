@@ -9,7 +9,7 @@ const { piece } = Astro.props;
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 const file = (f) => `${base}/pieces/${piece.slug}/${f}`;
 ---
-<Layout title={piece.title}>
+<Layout title={piece.title} wide>
   <div class="titlebar">
     <h1>{piece.title}</h1>
     <a class="btn" href={`${base}/`}>◄ All pieces</a>
@@ -21,7 +21,8 @@ const file = (f) => `${base}/pieces/${piece.slug}/${f}`;
     ))}
   </nav>
   {piece.tracks.map((t, i) => (
-    <section data-panel={t.key} hidden={i !== 0}>
+    <section class="cols" data-panel={t.key} hidden={i !== 0}>
+      <div class="media">
       {t.audio && (
         <section class="box">
           <h2><span>Audio</span><button type="button" class="min" aria-label="Minimize Audio" aria-expanded="true"></button></h2>
@@ -44,8 +45,9 @@ const file = (f) => `${base}/pieces/${piece.slug}/${f}`;
           </div>
         </section>
       )}
+      </div>
       {t.pdf && (
-        <section class="box">
+        <section class="box score">
           <h2><span>Score PDF</span><button type="button" class="min" aria-label="Minimize Score PDF" aria-expanded="true"></button></h2>
           <div class="body">
           <div class="pdfview" data-src={file(t.pdf)}>
@@ -111,6 +113,59 @@ const file = (f) => `${base}/pieces/${piece.slug}/${f}`;
     ['timeupdate', 'loadedmetadata', 'durationchange', 'seeked'].forEach((e) => m.addEventListener(e, paint));
     ['play', 'pause', 'ended'].forEach((e) => m.addEventListener(e, state));
   });
+  // Desktop mode: the score fills the window height, the video column matches it,
+  // and the body is as wide as that needs. If it won't fit the width, fall back to one column.
+  const root = document.documentElement;
+  let lastPh = 0;
+  const fit = () => {
+    const c = document.querySelector('.cols:not([hidden])');
+    if (!c) return;
+    const v = c.querySelector('.video');
+    const score = c.querySelector('.score');
+    const pages = c.querySelector('.pages');
+    const media = c.querySelector('.media');
+    const mobile = () => {
+      root.classList.remove('desk');
+      document.querySelectorAll('.video').forEach((e) => { e.style.height = ''; });
+    };
+    if (!score) return mobile();
+    root.classList.add('desk');
+    document.querySelectorAll('.box > .body').forEach((e) => { e.hidden = false; });
+    document.querySelectorAll('.min').forEach((e) => e.setAttribute('aria-expanded', 'true'));
+    document.querySelectorAll('.video').forEach((e) => { e.style.height = ''; });
+    if (v) v.style.height = '240px';
+    let ph = lastPh;
+    if (pages.offsetHeight) {
+      root.style.setProperty('--ph', '480px');
+      const total = document.body.getBoundingClientRect().bottom + scrollY + 12;
+      ph = Math.floor(innerHeight - (total - pages.offsetHeight));
+      lastPh = ph;
+    }
+    if (ph < 380) return mobile();
+    const apply = () => {
+      root.style.setProperty('--ph', `${ph}px`);
+      if (v && pages.offsetHeight) {
+        const other = media.offsetHeight - v.offsetHeight;
+        const cs = getComputedStyle(score);
+        const outer = score.offsetHeight + parseFloat(cs.marginTop) + parseFloat(cs.marginBottom);
+        v.style.height = `${Math.max(200, outer - other)}px`;
+      } else if (v) v.style.height = '';
+    };
+    apply();
+    const excess = root.scrollHeight - innerHeight;
+    if (excess > 0 && pages.offsetHeight) {
+      ph -= excess;
+      lastPh = ph;
+      if (ph < 380) return mobile();
+      apply();
+    }
+    const need = media.getBoundingClientRect().width + 16 + score.getBoundingClientRect().width + 18;
+    if (need > innerWidth - 24) mobile();
+  };
+  addEventListener('resize', fit);
+  addEventListener('refit', fit);
+  addEventListener('click', () => setTimeout(fit));
+  fit();
   const tabs = document.querySelectorAll('[data-tab]');
   const panels = document.querySelectorAll('[data-panel]');
   // Audio syncs with audio and video with video, never across kinds.

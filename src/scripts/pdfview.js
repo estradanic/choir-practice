@@ -22,6 +22,10 @@ async function init(root) {
     pages.push({ page, wrap, vp: page.getViewport({ scale: 1 }), key: '' });
   }
 
+  const first = pages[0].vp;
+  root.closest('.cols')?.style.setProperty('--pa', first.width / first.height);
+  dispatchEvent(new Event('refit'));
+
   const scaleFor = (p) => {
     const h = scroller.clientHeight - 16;
     const w = scroller.clientWidth - 16;

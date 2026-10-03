@@ -1,5 +1,5 @@
 ---
-const { title } = Astro.props;
+const { title, wide } = Astro.props;
 ---
 <html lang="en">
   <head>
@@ -50,6 +50,13 @@ const { title } = Astro.props;
       .min::before { content: ""; position: absolute; box-sizing: border-box; background: #000; }
       .min[aria-expanded=true]::before { left: 6px; bottom: 5px; width: 8px; height: 3px; }
       .min[aria-expanded=false]::before { left: 6px; top: 5px; width: 9px; height: 8px; background: none; border: 1px solid #000; border-top-width: 2px; }
+      html.desk body.wide { width: fit-content; max-width: calc(100vw - 24px); }
+      html.desk .cols { --pa: 0.773; display: grid; grid-template-columns: auto auto; gap: 0 16px; align-items: start; justify-content: center; }
+      html.desk .media { min-width: 22rem; }
+      html.desk .media .video { width: auto; max-width: none; }
+      html.desk .min { display: none; }
+      html.desk .score { width: calc((var(--ph) - 16px) * var(--pa) + 32px); }
+      html.desk .score .pages { height: var(--ph); }
       [hidden] { display: none !important; }
       .pdfview .bar { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
       .pdfview .bar button { padding: 3px 0; min-width: 30px; }
@@ -69,5 +76,5 @@ const { title } = Astro.props;
       [hidden] { display: none !important; }
     </style>
   </head>
-  <body><slot /></body>
+  <body class={wide ? 'wide' : undefined}><slot /></body>
 </html>
