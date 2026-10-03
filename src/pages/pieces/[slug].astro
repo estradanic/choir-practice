@@ -8,9 +8,12 @@ export function getStaticPaths() {
 const { piece } = Astro.props;
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 const synced = !!piece.tracks[0].video;
+// Scores are always US Letter, so the layout doesn't need to wait for the PDF to load.
+const pa = piece.tracks.some((t) => t.pdf) ? 8.5 / 11 : null;
 const file = (f) => `${base}/pieces/${piece.slug}/${f}`;
 ---
 <Layout title={piece.title} wide>
+  {pa && <script is:inline define:vars={{ pa }}>document.documentElement.style.setProperty('--pa', pa); window.__paSet = true;</script>}
   <div class="titlebar">
     <h1>{piece.title}{piece.composer && ` - ${piece.composer}`}</h1>
     <a class="btn" href={`${base}/`}>◄ All pieces</a>
@@ -209,7 +212,7 @@ const file = (f) => `${base}/pieces/${piece.slug}/${f}`;
   const reveal = () => root.classList.remove('pre');
   addEventListener('refit', () => { fit(); reveal(); });
   fit();
-  if (!document.querySelector('.score')) reveal();
+  if (!document.querySelector('.score') || window.__paSet) reveal();
   else setTimeout(reveal, 2500);
   const tabs = document.querySelectorAll('[data-tab]');
   const panels = document.querySelectorAll('[data-panel]');

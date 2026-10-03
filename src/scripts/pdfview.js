@@ -1,7 +1,7 @@
-import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.min.mjs';
 import workerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url';
 
-pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
+let lib;
+const load = () => (lib ||= import('pdfjs-dist/legacy/build/pdf.min.mjs').then((m) => { m.GlobalWorkerOptions.workerSrc = workerUrl; return m; }));
 
 const ZOOMS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3];
 
@@ -9,6 +9,7 @@ async function init(root) {
   const scroller = root.querySelector('.pages');
   const label = root.querySelector('.pg');
   const bar = root.querySelector('.bar');
+  const pdfjs = await load();
   const doc = await pdfjs.getDocument({ url: root.dataset.src }).promise;
   let zi = 2;
   let cur = 0;
