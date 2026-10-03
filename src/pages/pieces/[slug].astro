@@ -7,23 +7,23 @@ export function getStaticPaths() {
 }
 const { piece } = Astro.props;
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const synced = !!piece.tracks[0].video;
 const file = (f) => `${base}/pieces/${piece.slug}/${f}`;
 ---
 <Layout title={piece.title} wide>
   <div class="titlebar">
-    <h1>{piece.title}</h1>
+    <h1>{piece.title}{piece.composer && ` - ${piece.composer}`}</h1>
     <a class="btn" href={`${base}/`}>◄ All pieces</a>
   </div>
-  <p>{piece.composer}</p>
-  <nav class="tabs" role="tablist">
+  {!synced && <nav class="tabs" role="tablist" >
     {piece.tracks.map((t, i) => (
-      <button role="tab" data-tab={t.key} aria-selected={i === 0 ? 'true' : 'false'}>{t.label}</button>
+      <button role="tab" data-tab={t.key} data-audio={t.audio ? file(t.audio) : undefined} data-video={t.video || undefined} data-name={`${piece.slug}-${t.key}.mp3`} aria-selected={i === 0 ? 'true' : 'false'}>{t.label}</button>
     ))}
-  </nav>
-  {piece.tracks.map((t, i) => (
+  </nav>}
+  {piece.tracks.filter((_, i) => !synced || i === 0).map((t, i) => (
     <section class="cols" data-panel={t.key} hidden={i !== 0}>
       <div class="media">
-      {t.audio && (
+      {!synced && t.audio && (
         <section class="box">
           <h2><span>Audio</span><button type="button" class="min" aria-label="Minimize Audio" aria-expanded="true"></button></h2>
           <div class="body">
@@ -34,7 +34,25 @@ const file = (f) => `${base}/pieces/${piece.slug}/${f}`;
           </div>
         </section>
       )}
-      {t.video && (
+      {synced && i === 0 && (
+        <section class="box">
+          <h2><span>Video</span><button type="button" class="min" aria-label="Minimize Video" aria-expanded="true"></button></h2>
+          <div class="body">
+          <Player kind="video" src={t.video}>
+            <nav class="tabs" role="tablist" data-synced>
+              {piece.tracks.map((x, j) => (
+                <button type="button" role="tab" data-tab={x.key} data-audio={x.audio ? file(x.audio) : undefined} data-video={x.video || undefined} data-name={`${piece.slug}-${x.key}.mp3`} aria-selected={j === 0 ? 'true' : 'false'}>{x.label}</button>
+              ))}
+            </nav>
+          </Player>
+          <p class="actions">
+            <a class="btn" id="dl-video" href={t.video} target="_blank" rel="noopener">Download video</a>
+            <a class="btn" id="dl-audio" href={file(t.audio)} download={`${piece.slug}-${t.key}.mp3`}>Download audio</a>
+          </p>
+          </div>
+        </section>
+      )}
+      {!synced && t.video && (
         <section class="box">
           <h2><span>Video</span><button type="button" class="min" aria-label="Minimize Video" aria-expanded="true"></button></h2>
           <div class="body">
@@ -150,12 +168,14 @@ const file = (f) => `${base}/pieces/${piece.slug}/${f}`;
     if (ph < 380) return mobile();
     const apply = () => {
       root.style.setProperty('--ph', `${ph}px`);
+      let h = '';
       if (v && pages.offsetHeight) {
         const other = media.offsetHeight - v.offsetHeight;
         const cs = getComputedStyle(score);
         const outer = score.offsetHeight + parseFloat(cs.marginTop) + parseFloat(cs.marginBottom);
-        v.style.height = `${Math.max(200, outer - other)}px`;
-      } else if (v) v.style.height = '';
+        h = `${Math.max(200, outer - other)}px`;
+      }
+      document.querySelectorAll('.video').forEach((e) => { e.style.height = h; });
     };
     apply();
     const excess = root.scrollHeight - innerHeight;
@@ -169,9 +189,11 @@ const file = (f) => `${base}/pieces/${piece.slug}/${f}`;
     if (need > innerWidth - 24) mobile();
   };
   addEventListener('resize', fit);
-  addEventListener('refit', fit);
-  addEventListener('click', () => setTimeout(fit));
+  const reveal = () => root.classList.remove('pre');
+  addEventListener('refit', () => { fit(); reveal(); });
   fit();
+  if (!document.querySelector('.score')) reveal();
+  else setTimeout(reveal, 2500);
   const tabs = document.querySelectorAll('[data-tab]');
   const panels = document.querySelectorAll('[data-panel]');
   // Audio syncs with audio and video with video, never across kinds.
@@ -191,12 +213,91 @@ const file = (f) => `${base}/pieces/${piece.slug}/${f}`;
       to.load();
     }
   };
+  // Every tab shows the same score, so keep one viewer and move it into the visible panel.
+  const score = document.querySelector('.score');
+  document.querySelectorAll('.score').forEach((e) => { if (e !== score) e.remove(); });
+  // Synced mode: one muted video drives silent-until-selected MP3s, so switching tabs
+  // only changes which one is unmuted (no seeking, no reloading).
+  const synced = document.querySelector('nav.tabs[data-synced]');
+  const aud = {};
+  let setActive;
+  const dlVideo = document.getElementById('dl-video');
+  const dlAudio = document.getElementById('dl-audio');
+  if (synced) {
+    const v = document.querySelector('.player video');
+    v.muted = true;
+    tabs.forEach((t) => {
+      if (!t.dataset.audio) return;
+      const a = new Audio();
+      a.preload = 'auto';
+      a.src = t.dataset.audio;
+      aud[t.dataset.tab] = a;
+    });
+    // Crossfade between parts with Web Audio gain ramps (smoother than ramping element volume,
+    // and it also works on iOS). Without Web Audio, fall back to a hard mute.
+    let active = tabs[0].dataset.tab;
+    let ctx = null;
+    const gains = {};
+    const TAU = 0.04;
+    const graph = () => {
+      if (ctx || !window.AudioContext) return;
+      ctx = new AudioContext();
+      Object.entries(aud).forEach(([k, a]) => {
+        const g = ctx.createGain();
+        a.muted = false;
+        g.gain.value = k === active ? 1 : 0;
+        ctx.createMediaElementSource(a).connect(g).connect(ctx.destination);
+        gains[k] = g;
+      });
+    };
+    const levels = () => {
+      Object.entries(aud).forEach(([k, a]) => {
+        const on = k === active;
+        if (!ctx) { a.muted = !on; return; }
+        gains[k].gain.cancelScheduledValues(ctx.currentTime);
+        gains[k].gain.setTargetAtTime(on ? 1 : 0, ctx.currentTime, TAU);
+      });
+    };
+    setActive = (key) => { active = key; levels(); };
+    levels();
+    v.addEventListener('play', () => { graph(); ctx?.resume(); }, { capture: true });
+    const all = () => Object.values(aud);
+    // Seeking the audible part makes a click, so it gets a looser tolerance than the silent ones.
+    const off = (k, a) => Math.abs(a.currentTime - v.currentTime) > (k === active ? 0.25 : 0.03);
+    const resume = () => Object.entries(aud).forEach(([k, a]) => {
+      if (off(k, a)) a.currentTime = v.currentTime;
+      if (a.paused) a.play().catch(() => {});
+    });
+    v.addEventListener('play', resume);
+    v.addEventListener('playing', resume);
+    ['pause', 'waiting', 'ended'].forEach((e) => v.addEventListener(e, () => all().forEach((a) => a.pause())));
+    v.addEventListener('seeked', () => all().forEach((a) => { a.currentTime = v.currentTime; }));
+    setInterval(() => {
+      if (v.paused || v.seeking) return;
+      Object.entries(aud).forEach(([k, a]) => { if (off(k, a)) a.currentTime = v.currentTime; });
+    }, 500);
+  }
   tabs.forEach((tab) => tab.addEventListener('click', () => {
+    if (synced) {
+      tabs.forEach((x) => x.setAttribute('aria-selected', String(x === tab)));
+      setActive(tab.dataset.tab);
+      dlVideo.hidden = !tab.dataset.video;
+      if (tab.dataset.video) dlVideo.href = tab.dataset.video;
+      dlAudio.hidden = !tab.dataset.audio;
+      if (tab.dataset.audio) { dlAudio.href = tab.dataset.audio; dlAudio.download = tab.dataset.name; }
+      return;
+    }
     const prev = [...panels].find((p) => !p.hidden);
     const next = [...panels].find((p) => p.dataset.panel === tab.dataset.tab);
     if (!next || prev === next) return;
     tabs.forEach((x) => x.setAttribute('aria-selected', String(x === tab)));
+    const sc = score?.querySelector('.pages');
+    const left = sc ? sc.scrollLeft : 0;
     panels.forEach((p) => { p.hidden = p !== next; });
+    if (score) {
+      next.append(score);
+      sc.scrollLeft = left;
+    }
     ['audio', 'video'].forEach((k) => handOff(media(prev, k), media(next, k)));
   }));
 </script>

@@ -7,6 +7,7 @@ const { title, wide } = Astro.props;
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex, nofollow" />
     <title>{title}</title>
+    {wide && <script is:inline>document.documentElement.classList.add('pre')</script>}
     <style is:global>
       :root { --face: #d4d0c8; --hi: #fff; --mid: #808080; --dark: #404040; --navy: #0a246a; --raised: inset -1px -1px var(--dark), inset 1px 1px var(--hi), inset -2px -2px var(--mid), inset 2px 2px var(--face); --sunken: inset 1px 1px var(--mid), inset -1px -1px var(--hi), inset 2px 2px var(--dark), inset -2px -2px var(--face); }
       html { background: #5f9fc9; padding: 0 12px; min-height: 100%; }
@@ -23,6 +24,8 @@ const { title, wide } = Astro.props;
       button:active, .btn:active { box-shadow: var(--sunken); padding: 6px 13px 4px 15px; }
       button:focus-visible, .btn:focus-visible { outline: 1px dotted #000; outline-offset: -4px; }
       nav.tabs { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0; }
+      .player .tabs { margin: 6px 0 0; }
+      .player:fullscreen .tabs { margin: 0; padding: 4px; background: var(--face); }
       nav.tabs button[aria-selected=true] { box-shadow: var(--sunken); font-weight: bold; background: #e8e6e0; }
       input[type=search] { font: inherit; background: #fff; border: 0; box-shadow: var(--sunken); padding: 5px 6px; }
       .controls { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
@@ -58,12 +61,14 @@ const { title, wide } = Astro.props;
       .min[aria-expanded=true]::before { left: 6px; bottom: 5px; width: 8px; height: 3px; }
       .min[aria-expanded=false]::before { left: 6px; top: 5px; width: 9px; height: 8px; background: none; border: 1px solid #000; border-top-width: 2px; }
       html.desk body.wide { width: fit-content; max-width: calc(100vw - 24px); }
-      html.desk .cols { --pa: 0.773; display: grid; grid-template-columns: auto auto; gap: 0 16px; align-items: start; justify-content: center; }
+      html.desk { --pa: 0.773; }
+      html.desk .cols { display: grid; grid-template-columns: auto auto; gap: 0 16px; align-items: start; justify-content: center; }
       html.desk .media { min-width: 22rem; }
       html.desk .media .video { width: auto; max-width: none; }
       html.desk .min { display: none; }
       html.desk .score { width: calc((var(--ph) - 16px) * var(--pa) + 32px); }
       html.desk .score .pages { height: var(--ph); }
+      html.pre body { visibility: hidden; }
       [hidden] { display: none !important; }
       .pdfview .bar { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
       .pdfview .bar button { padding: 3px 0; min-width: 30px; }

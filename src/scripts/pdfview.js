@@ -23,8 +23,11 @@ async function init(root) {
   }
 
   const first = pages[0].vp;
-  root.closest('.cols')?.style.setProperty('--pa', first.width / first.height);
-  dispatchEvent(new Event('refit'));
+  if (!window.__paSet) {
+    window.__paSet = true;
+    document.documentElement.style.setProperty('--pa', first.width / first.height);
+    dispatchEvent(new Event('refit'));
+  }
 
   const scaleFor = (p) => {
     const h = scroller.clientHeight - 16;
