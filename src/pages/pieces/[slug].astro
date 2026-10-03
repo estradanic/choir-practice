@@ -141,7 +141,14 @@ const file = (f) => `${base}/pieces/${piece.slug}/${f}`;
   // and the body is as wide as that needs. If it won't fit the width, fall back to one column.
   const root = document.documentElement;
   let lastPh = 0;
+  // fit() briefly tries desktop mode, which can shrink the page and clamp the scroll position,
+  // so put the scroll position back afterwards (matters on phones, where it runs mid-scroll).
   const fit = () => {
+    const y = scrollY;
+    measure();
+    if (scrollY !== y) scrollTo(0, y);
+  };
+  const measure = () => {
     const c = document.querySelector('.cols:not([hidden])');
     if (!c) return;
     const v = c.querySelector('.video');
