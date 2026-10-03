@@ -1,5 +1,6 @@
 ---
 import Layout from '../../layouts/Layout.astro';
+import Player from '../../components/Player.astro';
 import { getPieces } from '../../lib/pieces.js';
 export function getStaticPaths() {
   return getPieces().map((p) => ({ params: { slug: p.slug }, props: { piece: p } }));
@@ -25,7 +26,7 @@ const file = (f) => `${base}/pieces/${piece.slug}/${f}`;
         <section class="box">
           <h2><span>Audio</span><button type="button" class="min" aria-label="Minimize Audio" aria-expanded="true"></button></h2>
           <div class="body">
-          <audio controls preload="auto" src={file(t.audio)}></audio>
+          <Player kind="audio" src={file(t.audio)} />
           <p class="actions">
             <a class="btn" href={file(t.audio)} download={`${piece.slug}-${t.key}.mp3`}>Download audio</a>
           </p>
@@ -36,7 +37,7 @@ const file = (f) => `${base}/pieces/${piece.slug}/${f}`;
         <section class="box">
           <h2><span>Video</span><button type="button" class="min" aria-label="Minimize Video" aria-expanded="true"></button></h2>
           <div class="body">
-          <video class="video" controls playsinline preload="auto" src={t.video}></video>
+          <Player kind="video" src={t.video} />
           <p class="actions">
             <a class="btn" href={t.video} target="_blank" rel="noopener">Download video</a>
           </p>
@@ -47,9 +48,18 @@ const file = (f) => `${base}/pieces/${piece.slug}/${f}`;
         <section class="box">
           <h2><span>Score PDF</span><button type="button" class="min" aria-label="Minimize Score PDF" aria-expanded="true"></button></h2>
           <div class="body">
-          <object class="pdf" type="application/pdf" data={file(t.pdf)} aria-label={`${t.label} score`}>
-              <p>Your browser cannot display this PDF. <a href={file(t.pdf)}>Open it instead</a>.</p>
-            </object>
+          <div class="pdfview" data-src={file(t.pdf)}>
+            <div class="bar">
+              <button type="button" data-act="prev" aria-label="Previous page">◄</button>
+              <button type="button" data-act="next" aria-label="Next page">►</button>
+              <span class="pg">Page – / –</span>
+              <button type="button" data-act="out" aria-label="Zoom out">–</button>
+              <button type="button" data-act="in" aria-label="Zoom in">+</button>
+              <button type="button" data-act="fit">Fit</button>
+            </div>
+            <div class="pages" tabindex="0" aria-label={`${t.label} score`}></div>
+            <p class="fallback">Can't see the score? Use the buttons below to open or download it.</p>
+          </div>
           <p class="actions">
             <a class="btn" href={file(t.pdf)} target="_blank" rel="noopener">Open in new tab</a>
             <a class="btn" href={file(t.pdf)} download>Download PDF</a>
@@ -61,12 +71,45 @@ const file = (f) => `${base}/pieces/${piece.slug}/${f}`;
   ))}
 </Layout>
 <script>
+  import '../../scripts/pdfview.js';
   document.addEventListener('click', (e) => {
     const b = e.target.closest?.('.min');
     if (!b) return;
     const body = b.closest('.box').querySelector('.body');
     body.hidden = !body.hidden;
     b.setAttribute('aria-expanded', String(!body.hidden));
+  });
+  const fmt = (s) => {
+    if (!isFinite(s)) s = 0;
+    return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+  };
+  document.querySelectorAll('.player').forEach((p) => {
+    const m = p.querySelector('audio, video');
+    const pp = p.querySelector('.pp');
+    const seek = p.querySelector('.seek');
+    const time = p.querySelector('.time');
+    let dragging = false;
+    const paint = () => {
+      if (!dragging) seek.value = m.duration ? (m.currentTime / m.duration) * 1000 : 0;
+      seek.style.setProperty('--p', `${seek.value / 10}%`);
+      time.textContent = `${fmt(dragging ? (seek.value / 1000) * m.duration : m.currentTime)} / ${fmt(m.duration)}`;
+    };
+    const state = () => {
+      const playing = !m.paused;
+      pp.dataset.state = playing ? 'playing' : 'paused';
+      pp.setAttribute('aria-label', playing ? 'Pause' : 'Play');
+    };
+    const toggle = () => (m.paused ? m.play().catch(() => {}) : m.pause());
+    pp.addEventListener('click', toggle);
+    if (m.tagName === 'VIDEO') m.addEventListener('click', toggle);
+    seek.addEventListener('input', () => {
+      dragging = true;
+      if (m.duration) m.currentTime = (seek.value / 1000) * m.duration;
+      paint();
+    });
+    seek.addEventListener('change', () => { dragging = false; paint(); });
+    ['timeupdate', 'loadedmetadata', 'durationchange', 'seeked'].forEach((e) => m.addEventListener(e, paint));
+    ['play', 'pause', 'ended'].forEach((e) => m.addEventListener(e, state));
   });
   const tabs = document.querySelectorAll('[data-tab]');
   const panels = document.querySelectorAll('[data-panel]');

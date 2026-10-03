@@ -1,0 +1,13 @@
+---
+const { kind, src } = Astro.props;
+---
+<div class="player">
+  {kind === 'video'
+    ? <video class="video" playsinline preload="auto" src={src}></video>
+    : <audio preload="auto" src={src}></audio>}
+  <div class="controls">
+    <button type="button" class="pp" aria-label="Play" data-state="paused"></button>
+    <input type="range" class="seek" min="0" max="1000" value="0" step="1" aria-label="Seek" />
+    <span class="time">0:00 / 0:00</span>
+  </div>
+</div>
