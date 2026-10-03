@@ -2,7 +2,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const root = path.resolve('public/pieces');
-const videoBase = JSON.parse(fs.readFileSync('site.json', 'utf8')).videoBase.replace(/\/$/, '');
+const site = JSON.parse(fs.readFileSync('site.json', 'utf8'));
+const videoBase = site.videoBase.replace(/\/$/, '');
+// Bump videoVersion in site.json after re-uploading videos, to bypass browsers' long-lived cache.
+const ver = site.videoVersion ? `?v=${site.videoVersion}` : '';
 // Fallback for pieces whose piece.json has no "parts" (export.py records the score's
 // staff order there, which is what normally drives the track order).
 const order = ['soprano', 'alto', 'tenor', 'baritone', 'bass'];
@@ -26,7 +29,7 @@ export function getPieces() {
           .filter((n) => n !== 'full' && n !== 'score')
       );
       videos.forEach((n) => n !== 'full' && names.add(n));
-      const vid = (n) => (videos.has(n) ? `${videoBase}/${d.name}/${n}.mp4` : null);
+      const vid = (n) => (videos.has(n) ? `${videoBase}/${d.name}/${n}.mp4${ver}` : null);
       // Tracks follow the score's staff order (meta.parts), then the fallback list.
       const staff = meta.parts || [];
       const rank = (n) => {
