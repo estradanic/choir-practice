@@ -10,7 +10,10 @@ Input: path to an `.mscz` file (ask if not given). Keep it token-cheap: run the 
 
 ## Steps
 
-1. **Ask (one question call)**: title, composer, set name (optional, plus position in the set), tags (offer existing ones: `grep -h '"tags"' public/pieces/*/piece.json`), and **anything non-standard about the parts** — anything that is not standard SATB.
+1. **Ask (one question call)**: title, composer, set name (optional, plus position in the set), tags, and **anything non-standard about the parts** — anything that is not standard SATB.
+   - **Always ask about tags, every time — never skip it.** Do not infer them from the title, composer or set, and do not copy them from a sibling piece in the same set (a Gloria is a Mass, but confirm rather than assume). Offer the existing tags to pick from:
+     `python3 -c "import json,glob;print(sorted({t for f in glob.glob('public/pieces/*/piece.json') for t in json.load(open(f)).get('tags',[])}))"`
+     (A plain `grep -h '"tags"'` only matches the opening `"tags": [` line and never shows the values — that's why the tags list must be read properly.) Reuse an existing tag when it fits; confirm any new tag name instead of inventing one.
    - Offer options like Descant, extra Soprano/Alto splits, Baritone, Bass II, doubling, a piano/organ part, or "standard SATB, nothing unusual".
    - Compare with the score: `export.py` prints the parts it found. A part the user mentions but the export doesn't produce means the score is set up unusually — see Notes.
    - Never rely on this alone: check the produced `<part>.mp3` names against what the user said and ask if they disagree.

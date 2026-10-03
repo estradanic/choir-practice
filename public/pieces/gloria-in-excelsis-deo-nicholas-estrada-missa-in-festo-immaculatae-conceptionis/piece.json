@@ -1,21 +1,19 @@
 {
-  "title": "Deo Gratias",
+  "title": "Gloria in Excelsis Deo",
   "composer": "Nicholas Estrada",
   "set": "Missa in Festo Immaculatae Conceptionis",
-  "setOrder": 4,
+  "setOrder": 1,
   "tags": [
     "Mass"
   ],
   "videos": [
     "full",
-    "descant",
     "soprano",
     "alto",
     "tenor",
     "bass"
   ],
   "parts": [
-    "descant",
     "soprano",
     "alto",
     "tenor",
