@@ -160,7 +160,7 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
       const old = sp;
       sp = s;
       shown();
-      if (m.tagName === 'VIDEO') { m.playbackRate = s; return; }
+      if (m.tagName === 'VIDEO') { if (p.onSpeed) p.onSpeed(s); else m.playbackRate = s; return; }
       const t = (m.currentTime * stretch(old)) / stretch(s);
       const playing = !m.paused;
       const url = (s !== 1 && slow?.[s]) || orig;
@@ -281,96 +281,420 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
   // Synced mode: one muted video drives silent-until-selected MP3s, so switching tabs
   // only changes which one is unmuted (no seeking, no reloading).
   const synced = document.querySelector('nav.tabs[data-synced]');
-  const aud = {};
-  let setActive;
+  let setActive = () => {};
   const dlVideo = document.getElementById('dl-video');
   const dlAudio = document.getElementById('dl-audio');
   if (synced) {
     const v = document.querySelector('.player video');
-    v.muted = true;
-    const slowMap = {};
-    let sp = 1;
+    const vp = v.closest('.player');
+    const urls = {};
     tabs.forEach((t) => {
-      if (!t.dataset.audio) return;
-      const a = new Audio();
-      a.preload = 'auto';
-      a.src = t.dataset.audio;
-      a.dataset.orig = t.dataset.audio;
-      aud[t.dataset.tab] = a;
-      slowMap[t.dataset.tab] = t.dataset.slow ? JSON.parse(t.dataset.slow) : {};
+      if (t.dataset.audio) urls[t.dataset.tab] = { 1: t.dataset.audio, ...(t.dataset.slow ? JSON.parse(t.dataset.slow) : {}) };
     });
-    // Slowed parts are pre-rendered files, so their clock runs fac times longer than the video's.
-    const fac = (k) => (sp !== 1 && slowMap[k][sp] ? sp : 1);
-    const pos = (k) => v.currentTime / fac(k);
-    // Crossfade between parts with Web Audio gain ramps (smoother than ramping element volume,
-    // and it also works on iOS). Without Web Audio, fall back to a hard mute.
+    const keys = Object.keys(urls);
     let active = tabs[0].dataset.tab;
     let ctx = null;
-    const gains = {};
-    const TAU = 0.04;
-    const graph = () => {
-      if (ctx || !window.AudioContext) return;
-      ctx = new AudioContext();
-      Object.entries(aud).forEach(([k, a]) => {
-        const g = ctx.createGain();
-        a.muted = false;
-        g.gain.value = k === active ? 1 : 0;
-        ctx.createMediaElementSource(a).connect(g).connect(ctx.destination);
-        gains[k] = g;
+    try { ctx = new AudioContext(); } catch {}
+    // Parts are decoded into memory and played as Web Audio buffer sources on the audio clock:
+    // no <audio> elements, no seeking, sample-accurate sync. The video follows that clock.
+    // Without Web Audio, fall back to the video's own (full choir) sound.
+    if (!ctx) v.muted = false;
+    else {
+      v.muted = true;
+      if (navigator.audioSession) navigator.audioSession.type = 'playback';
+      const TAU = 0.04;
+      // Debug recorder (turn on with ?debug, off with ?debug=0): a timestamped event and
+      // sample log with a button to copy it, so a bad session can be inspected afterwards.
+      if (location.search.includes('debug=0')) localStorage.removeItem('cpdebug');
+      else if (location.search.includes('debug')) localStorage.setItem('cpdebug', '1');
+      const debug = localStorage.getItem('cpdebug') === '1';
+      const T0 = performance.now();
+      const logs = [];
+      const log = (...a) => {
+        if (!debug) return;
+        logs.push(`${((performance.now() - T0) / 1000).toFixed(2)} ${a.join(' ')}`);
+        if (logs.length > 8000) logs.shift();
+      };
+      log('page', navigator.userAgent, 'ctx', ctx.sampleRate, 'base', ctx.baseLatency, 'out', ctx.outputLatency, 'ts', typeof ctx.getOutputTimestamp);
+      const master = ctx.createGain();
+      master.connect(ctx.destination);
+      const unlock = () => {
+        if (ctx.state === 'running') return;
+        ctx.resume();
+        const s = ctx.createBufferSource();
+        s.buffer = ctx.createBuffer(1, 1, ctx.sampleRate);
+        s.connect(ctx.destination);
+        s.start();
+      };
+      ['pointerdown', 'touchend', 'click', 'keydown'].forEach((e) => document.addEventListener(e, unlock, { capture: true, passive: true }));
+      // Slowed parts are pre-rendered files, so their clock runs `f` times the music's.
+      const info = (sp, k) => {
+        const u = urls[k];
+        return sp !== 1 && u[sp] ? { url: u[sp], f: sp, rate: 1 } : { url: u[1], f: 1, rate: sp };
+      };
+      // Downmix in small slices so it never blocks the page (and the video) for long.
+      const mono = async (b) => {
+        if (b.numberOfChannels === 1) return b;
+        const o = ctx.createBuffer(1, b.length, b.sampleRate);
+        const d = o.getChannelData(0);
+        const n = b.numberOfChannels;
+        for (let c = 0; c < n; c++) {
+          const x = b.getChannelData(c);
+          for (let i = 0; i < x.length; i += 200000) {
+            const end = Math.min(x.length, i + 200000);
+            for (let j = i; j < end; j++) d[j] += x[j] / n;
+            await new Promise((r) => setTimeout(r));
+          }
+        }
+        return o;
+      };
+      // Parts are streamed: each compressed MP3 is kept in memory with a frame index, and only
+      // short windows around the playhead are decoded. Memory stays small however long the piece
+      // is, and tab switches are instant because every part's current window is already decoded.
+      const BR = [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320];
+      const RATES = [44100, 48000, 32000];
+      const WIN = 20;
+      const OV = 0.06;
+      const PRE = 3;
+      const parse = (ab) => {
+        const u = new Uint8Array(ab);
+        let o = 0;
+        if (u[0] === 0x49 && u[1] === 0x44 && u[2] === 0x33) o = 10 + (((u[6] & 127) << 21) | ((u[7] & 127) << 14) | ((u[8] & 127) << 7) | (u[9] & 127));
+        const fr = [];
+        let rate = 32000;
+        while (o + 4 <= u.length) {
+          if (u[o] !== 0xff || (u[o + 1] & 0xe0) !== 0xe0 || ((u[o + 1] >> 3) & 3) !== 3 || ((u[o + 1] >> 1) & 3) !== 1) { o++; continue; }
+          const br = BR[u[o + 2] >> 4] * 1000;
+          const s = RATES[(u[o + 2] >> 2) & 3];
+          if (!br || !s) { o++; continue; }
+          const len = Math.floor((144 * br) / s) + ((u[o + 2] >> 1) & 1);
+          if (o + len > u.length) break;
+          rate = s;
+          fr.push(o);
+          o += len;
+        }
+        fr.push(o);
+        const n = fr.length - 1;
+        return { u, fr, n, fd: 1152 / rate, dur: (n * 1152) / rate };
+      };
+      const idx = {};
+      const idxv = {};
+      const index = (s, k) => {
+        const id = `${s}/${k}`;
+        return (idx[id] ||= fetch(info(s, k).url)
+          .then((r) => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
+          .then((ab) => (idxv[id] = parse(ab)))
+          .catch((e) => { delete idx[id]; throw e; }));
+      };
+      const wins = {};
+      const ready = {};
+      const jobs = {};
+      let busy = false;
+      let sp = 1;
+      let tgt = 1;
+      const decodeWin = async (j) => {
+        const x = await index(j.s, j.k);
+        const t = performance.now();
+        let w;
+        if (!x.n) w = { buf: await mono(await ctx.decodeAudioData(x.u.slice().buffer)), t0: 0 };
+        else {
+          const fa = Math.max(0, Math.floor((j.i * WIN) / x.fd) - PRE);
+          const f1 = Math.min(x.n, Math.ceil(((j.i + 1) * WIN + OV) / x.fd));
+          w = { buf: await mono(await ctx.decodeAudioData(x.u.slice(x.fr[fa], x.fr[f1]).buffer)), t0: fa * x.fd };
+        }
+        log('decoded', j.id, Math.round(performance.now() - t), 'ms');
+        return w;
+      };
+      // One decode at a time, most urgent first.
+      const pump = async () => {
+        if (busy) return;
+        busy = true;
+        for (;;) {
+          let j = null;
+          Object.values(jobs).forEach((x) => { if (!x.run && (!j || x.p < j.p)) j = x; });
+          if (!j) break;
+          j.run = true;
+          try {
+            if (j.s !== sp && j.s !== tgt) throw new Error('stale');
+            const w = await decodeWin(j);
+            if (wins[j.id]) ready[j.id] = w;
+            j.res(w);
+          } catch (e) { delete wins[j.id]; j.rej(e); }
+          delete jobs[j.id];
+        }
+        busy = false;
+      };
+      const win = (s, k, i, p = 1e6) => {
+        const id = `${s}/${k}/${i}`;
+        if (!wins[id]) {
+          wins[id] = new Promise((res, rej) => { jobs[id] = { id, s, k, i, p, res, rej, run: false }; });
+          wins[id].catch(() => {});
+        } else if (jobs[id] && p < jobs[id].p) jobs[id].p = p;
+        pump();
+        return wins[id];
+      };
+      const winOf = (x, ft) => (x.n ? Math.floor(ft / WIN) : 0);
+      const warmBytes = () => {
+        [active, ...keys.filter((k) => k !== active)].forEach((k) => index(sp, k).catch(() => {}));
+        Object.keys(urls[keys[0]]).map(Number).forEach((x) => { if (x !== sp && urls[active]) index(x, active).catch(() => {}); });
+      };
+      // Keep every part's current and next window decoded (active part first), drop the rest.
+      const maintain = () => {
+        const m = pos();
+        const keep = new Set();
+        let p = 0;
+        [0, 1].forEach((d) => [active, ...keys.filter((k) => k !== active)].forEach((k) => {
+          const x = idxv[`${sp}/${k}`];
+          if (!x) return;
+          const i = winOf(x, m / info(sp, k).f);
+          for (let a = i - 1; a <= i + 2; a++) keep.add(`${sp}/${k}/${a}`);
+          if (d === 0 || (x.n && (i + 1) * WIN < x.dur)) win(sp, k, i + d, p++);
+        }));
+        Object.keys(wins).forEach((id) => { if (id.startsWith(`${sp}/`) && !keep.has(id) && !jobs[id]) { delete wins[id]; delete ready[id]; } });
+      };
+      let playing = false;
+      let m0 = 0;
+      let t0 = 0;
+      let epoch = 0;
+      let voices = {};
+      const starting = {};
+      // Everything is scheduled slightly ahead on the audio clock so starts and crossfades land
+      // exactly where they should, whatever the main thread is doing.
+      const LEAD = 0.06;
+      const posAt = (t) => (playing ? m0 + (t - t0) * sp : m0);
+      const pos = () => posAt(ctx.currentTime);
+      // Sound scheduled now is heard `lat` seconds later (output buffering, Bluetooth, resampling).
+      // Measure that so the video can be lined up with what is heard, not with what is scheduled.
+      let lat = 0;
+      const readLat = () => {
+        let l = 0;
+        try {
+          const ts = ctx.getOutputTimestamp();
+          if (ts.performanceTime > 0 && ts.contextTime > 0) l = ctx.currentTime - (ts.contextTime + (performance.now() - ts.performanceTime) / 1000);
+        } catch {}
+        if (!(l > 0.005)) l = ctx.outputLatency > 0.005 ? ctx.outputLatency : lat;
+        return Math.min(Math.max(l, 0), 1);
+      };
+      const heard = () => posAt(ctx.currentTime - lat);
+      const stopVoice = (vo, at = ctx.currentTime) => {
+        vo.done = true;
+        vo.g.gain.cancelScheduledValues(at);
+        vo.g.gain.setTargetAtTime(0, at, TAU);
+        vo.segs.forEach((s) => { try { s.stop(at + TAU * 6); } catch {} });
+        setTimeout(() => vo.g.disconnect(), (at - ctx.currentTime + TAU * 6) * 1000 + 100);
+      };
+      const stopAll = (at) => { Object.values(voices).forEach((vo) => stopVoice(vo, at)); voices = {}; };
+      // Schedule one window of a part from file time `ft` at context time `when`. The next window
+      // is joined with a short crossfade over an overlap of identical audio.
+      const place = (vo, w, wi, ft, when) => {
+        const { x, inf } = vo;
+        const bufEnd = w.t0 + w.buf.duration;
+        const nominal = x.n ? (wi + 1) * WIN + OV : Infinity;
+        const end = Math.min(nominal, bufEnd);
+        const last = !x.n || bufEnd < nominal - 0.02 || end >= x.dur - 0.05;
+        const span = end - ft;
+        if (span < 0.02) return false;
+        const src = ctx.createBufferSource();
+        src.buffer = w.buf;
+        src.playbackRate.value = inf.rate;
+        const gs = ctx.createGain();
+        const ov = OV / inf.rate;
+        const dur = span / inf.rate;
+        if (vo.joined) { gs.gain.setValueAtTime(0, when); gs.gain.linearRampToValueAtTime(1, when + ov); }
+        if (!last) { gs.gain.setValueAtTime(1, when + dur - ov); gs.gain.linearRampToValueAtTime(0, when + dur); }
+        src.connect(gs).connect(vo.g);
+        src.start(when, ft - w.t0, span);
+        vo.segs.push(src);
+        vo.joined = true;
+        vo.last = last;
+        vo.nextI = wi + 1;
+        vo.nextFt = (wi + 1) * WIN;
+        vo.nextWhen = when + (vo.nextFt - ft) / inf.rate;
+        return true;
+      };
+      const startVoice = async (k) => {
+        if (!urls[k]) return null;
+        const e = epoch;
+        const x = await index(sp, k);
+        const inf = info(sp, k);
+        for (let tries = 0; tries < 4; tries++) {
+          if (e !== epoch || !playing) return null;
+          const wi = winOf(x, posAt(ctx.currentTime + LEAD) / inf.f);
+          const w = await win(sp, k, wi, -1);
+          if (e !== epoch || !playing) return null;
+          const when = ctx.currentTime + LEAD;
+          const ft = posAt(when) / inf.f;
+          if (winOf(x, ft) !== wi) continue;
+          if (ft >= x.dur) return null;
+          const g = ctx.createGain();
+          g.gain.value = 0;
+          g.connect(master);
+          const vo = { k, x, inf, sp, g, segs: [], when, joined: false, done: false, last: false };
+          if (!place(vo, w, wi, ft, when)) { g.disconnect(); return null; }
+          g.gain.setTargetAtTime(1, when, TAU);
+          log('voice', k, 'at', when.toFixed(3), 'now', (when - LEAD).toFixed(3), 'ft', ft.toFixed(3), 'music', posAt(when).toFixed(3), 'win', wi);
+          return vo;
+        }
+        return null;
+      };
+      // Queue each playing part's next window ahead of time.
+      const advance = () => {
+        const now = ctx.currentTime;
+        // Safety net: if the selected part isn't playing for any reason, start it.
+        if (playing && urls[active] && !voices[active] && starting[active] === undefined) { log('remount', active); mount(); }
+        Object.values(voices).forEach((vo) => {
+          while (!vo.done && !vo.last && vo.nextWhen - now < 3) {
+            let when = vo.nextWhen;
+            let ft = vo.nextFt;
+            if (when < now + LEAD) {
+              log('late', vo.k, (now + LEAD - when).toFixed(3));
+              ft += (now + LEAD - when) * vo.inf.rate;
+              when = now + LEAD;
+            }
+            const wi = winOf(vo.x, ft);
+            const w = ready[`${vo.sp}/${vo.k}/${wi}`];
+            if (!w) { win(vo.sp, vo.k, wi, -1); break; }
+            if (!place(vo, w, wi, ft, when)) vo.last = true;
+          }
+        });
+      };
+      // Bring up the active part; the others only fade out once it is actually ready.
+      const mount = async () => {
+        const k = active;
+        const e = epoch;
+        if (!playing) return;
+        if (voices[k]) {
+          Object.keys(voices).forEach((x) => { if (x !== k) { stopVoice(voices[x]); delete voices[x]; } });
+          return;
+        }
+        if (starting[k] === e) return;
+        starting[k] = e;
+        let vo = null;
+        try { vo = await startVoice(k); } catch (err) { console.error(err); }
+        if (starting[k] === e) delete starting[k];
+        if (!vo) return;
+        if (e !== epoch || voices[k] || active !== k) { stopVoice(vo); return; }
+        Object.keys(voices).forEach((x) => { if (x !== k) { stopVoice(voices[x], vo.when); delete voices[x]; } });
+        voices[k] = vo;
+      };
+      const begin = async (tol = 0.05) => {
+        if (ctx.state !== 'running') await Promise.race([ctx.resume().catch(() => {}), new Promise((r) => setTimeout(r, 400))]);
+        if (v.paused) return;
+        if (playing && Math.abs(heard() - v.currentTime) < tol) return;
+        epoch++;
+        stopAll();
+        lat = readLat();
+        log('begin', 'v', v.currentTime.toFixed(2), 'lat', lat.toFixed(3));
+        t0 = ctx.currentTime + LEAD;
+        m0 = v.currentTime + (LEAD + lat) * sp;
+        playing = true;
+        mount();
+      };
+      const halt = () => {
+        log('halt');
+        epoch++;
+        playing = false;
+        stopAll();
+        m0 = v.currentTime;
+      };
+      ctx.onstatechange = () => { log('ctxstate', ctx.state); if (ctx.state === 'running' && !v.paused) begin(); };
+      ['waiting', 'stalled', 'seeking', 'seeked', 'playing', 'pause', 'ended', 'canplay'].forEach((e) => v.addEventListener(e, () => log('video', e, v.currentTime.toFixed(2), 'ready', v.readyState)));
+      let ignore = false;
+      v.addEventListener('playing', () => { if (!playing) begin(); });
+      v.addEventListener('pause', halt);
+      v.addEventListener('ended', halt);
+      v.addEventListener('seeked', () => {
+        if (ignore) { ignore = false; return; }
+        if (!v.paused) begin(0.25); else m0 = v.currentTime;
       });
-    };
-    const levels = () => {
-      Object.entries(aud).forEach(([k, a]) => {
-        const on = k === active;
-        if (!ctx) { a.muted = !on; return; }
-        gains[k].gain.cancelScheduledValues(ctx.currentTime);
-        gains[k].gain.setTargetAtTime(on ? 1 : 0, ctx.currentTime, TAU);
-      });
-    };
-    setActive = (key) => { active = key; levels(); };
-    levels();
-    v.addEventListener('play', () => { graph(); ctx?.resume(); }, { capture: true });
-    const all = () => Object.values(aud);
-    // Seeking the audible part makes a click, so it gets a looser tolerance than the silent ones.
-    const off = (k, a) => Math.abs(a.currentTime - pos(k)) > (k === active ? 0.25 : 0.03);
-    const resume = () => Object.entries(aud).forEach(([k, a]) => {
-      if (off(k, a)) a.currentTime = pos(k);
-      if (a.paused) a.play().catch(() => {});
-    });
-    // Speed change: stop, swap every part to the matching file, line them all up, then carry on.
-    let gen = 0;
-    let wasPlaying = null;
-    const rate = async () => {
-      if (v.playbackRate === sp) return;
-      sp = v.playbackRate;
-      const my = ++gen;
-      if (wasPlaying === null) wasPlaying = !v.paused;
-      v.pause();
-      await Promise.all(Object.entries(aud).map(([k, a]) => new Promise((done) => {
-        const url = (sp !== 1 && slowMap[k][sp]) || a.dataset.orig;
-        a.preservesPitch = true;
-        if (a.getAttribute('src') !== url) {
-          a.src = url;
-          a.addEventListener('loadedmetadata', done, { once: true });
-          setTimeout(done, 8000);
-        } else done();
-        a.defaultPlaybackRate = a.playbackRate = sp / fac(k);
-      })));
-      if (my !== gen) return;
-      Object.entries(aud).forEach(([k, a]) => { a.currentTime = pos(k); });
-      const go = wasPlaying;
-      wasPlaying = null;
-      if (go) v.play().catch(() => {});
-    };
-    v.addEventListener('ratechange', rate);
-    v.addEventListener('play', resume);
-    v.addEventListener('playing', resume);
-    ['pause', 'waiting', 'ended'].forEach((e) => v.addEventListener(e, () => all().forEach((a) => a.pause())));
-    v.addEventListener('seeked', () => Object.entries(aud).forEach(([k, a]) => { a.currentTime = pos(k); }));
-    setInterval(() => {
-      if (v.paused || v.seeking) return;
-      Object.entries(aud).forEach(([k, a]) => { if (off(k, a)) a.currentTime = pos(k); });
-    }, 500);
+      // Keep audio and video together. The audio clock can fall behind real time (a device
+      // underrun or a heavy decode stalls it), while the video keeps running on the wall clock.
+      // So if the audio is behind, skip it forward to where the video is; if the video is
+      // behind, ease it forward (seeking only when it is far off).
+      let lastFix = 0;
+      const dbg = debug ? document.body.appendChild(Object.assign(document.createElement('div'), { style: 'position:fixed;left:4px;top:4px;padding:4px;background:#000c;color:#0f0;font:11px monospace;z-index:9;white-space:pre' })) : null;
+      if (dbg) {
+        const txt = document.createElement('pre');
+        txt.style.margin = '0';
+        const btn = Object.assign(document.createElement('button'), { textContent: 'Copy log', type: 'button' });
+        btn.style.cssText = 'font:11px sans-serif;padding:2px 6px;margin-top:3px';
+        btn.onclick = async () => {
+          const all = logs.join('\n');
+          try { await navigator.clipboard.writeText(all); btn.textContent = `Copied ${logs.length} lines`; }
+          catch {
+            const ta = Object.assign(document.createElement('textarea'), { value: all });
+            ta.style.cssText = 'position:fixed;inset:40px;z-index:10;width:80%;height:70%';
+            document.body.append(ta); ta.select();
+          }
+        };
+        dbg.append(txt, btn);
+        dbg.txt = txt;
+      }
+      setInterval(() => {
+        if (!playing || v.paused || v.seeking || ctx.state !== 'running') return;
+        lat = lat * 0.8 + readLat() * 0.2;
+        const err = heard() - v.currentTime;
+        const line = `err ${err.toFixed(3)}  lat ${lat.toFixed(3)}  sp ${sp}  vr ${v.playbackRate.toFixed(3)}  ${ctx.state}  ${Object.keys(voices)}`;
+        if (dbg) dbg.txt.textContent = line;
+        if (debug) log("s", `err=${err.toFixed(3)} lat=${lat.toFixed(3)} raw=${readLat().toFixed(3)} v=${v.currentTime.toFixed(2)} heard=${heard().toFixed(2)} sched=${pos().toFixed(2)} ctx=${ctx.currentTime.toFixed(2)} vr=${v.playbackRate.toFixed(3)} sp=${sp} voices=${Object.keys(voices)}`);
+        const now = performance.now();
+        if (err < -0.2 && now - lastFix > 1000) {
+          lastFix = now;
+          log('RESYNC audio behind', err.toFixed(3));
+          const when = ctx.currentTime + LEAD;
+          m0 = v.currentTime + (LEAD + lat) * sp;
+          t0 = when;
+          epoch++;
+          stopAll(when);
+          mount();
+          return;
+        }
+        if (err > 0.8 && heard() < v.duration) {
+          log('SEEK video', err.toFixed(3));
+          ignore = true;
+          setTimeout(() => { ignore = false; }, 2000);
+          v.currentTime = heard();
+          return;
+        }
+        const k = Math.abs(err) > 0.2 ? 0.2 : 0.08;
+        const want = Math.abs(err) > 0.05 ? sp * (1 + Math.max(-k, Math.min(k, err))) : sp;
+        if (Math.abs(v.playbackRate - want) > 0.004) v.playbackRate = want;
+      }, 200);
+      let gen = 0;
+      // Speed change: crossfade to the matching pre-rendered files, then retime the video.
+      vp.onSpeed = async (s) => {
+        const my = ++gen;
+        log('speed', s);
+        tgt = s;
+        const k = urls[active] ? active : keys[0];
+        // Have the new speed's audio decoded for where playback will be when it switches over,
+        // including across a window boundary, so the switch never waits in silence.
+        try {
+          const x = await index(s, k);
+          const at = (d) => winOf(x, posAt(ctx.currentTime + d) / info(s, k).f);
+          for (let tries = 0; tries < 4 && my === gen; tries++) {
+            await Promise.all([...new Set([at(LEAD), at(0.6)])].map((i) => win(s, k, i, -1)));
+            if (ready[`${s}/${k}/${at(LEAD)}`]) break;
+          }
+        } catch (err) { if (err.message !== 'stale') console.error(err); }
+        if (my !== gen) return;
+        const when = ctx.currentTime + LEAD;
+        m0 = posAt(when);
+        t0 = when;
+        sp = s;
+        epoch++;
+        stopAll(when);
+        mount();
+        setTimeout(() => { v.playbackRate = s; }, LEAD * 1000);
+        Object.keys(idx).forEach((id) => { if (!id.startsWith(`${s}/`) && !id.endsWith(`/${active}`)) { delete idx[id]; delete idxv[id]; } });
+        Object.keys(wins).forEach((id) => { if (!id.startsWith(`${s}/`) && !jobs[id]) { delete wins[id]; delete ready[id]; } });
+        warmBytes();
+      };
+      setActive = (k) => { log('tab', k, 'v', v.currentTime.toFixed(2), 'heard', heard().toFixed(2)); active = k; mount(); warmBytes(); maintain(); };
+      warmBytes();
+      setInterval(() => { advance(); maintain(); }, 250);
+    }
+    if (!ctx) setActive = (k) => { active = k; };
   }
   tabs.forEach((tab) => tab.addEventListener('click', () => {
     if (synced) {
