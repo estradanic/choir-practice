@@ -53,9 +53,13 @@ async function init(root) {
   let lock = 0;
   const prev = bar.querySelector('[data-act=prev]');
   const next = bar.querySelector('[data-act=next]');
+  const zout = bar.querySelector('[data-act=out]');
+  const zin = bar.querySelector('[data-act=in]');
   const mark = () => {
     prev.disabled = cur <= 0;
     next.disabled = cur >= pages.length - 1;
+    zout.disabled = zi <= 0;
+    zin.disabled = zi >= ZOOMS.length - 1;
   };
 
   const update = () => {
