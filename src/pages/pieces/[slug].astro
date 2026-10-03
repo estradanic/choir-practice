@@ -58,6 +58,7 @@ const file = (f) => `${base}/pieces/${piece.slug}/${f}`;
               <button type="button" data-act="out" aria-label="Zoom out">–</button>
               <button type="button" data-act="in" aria-label="Zoom in">+</button>
               <button type="button" data-act="fit">Fit</button>
+              <button type="button" class="fs" data-act="fs" aria-label="Fullscreen"></button>
             </div>
             <div class="pages" tabindex="0" aria-label={`${t.label} score`}></div>
             <p class="fallback">Can't see the score? Use the buttons below to open or download it.</p>
@@ -104,6 +105,11 @@ const file = (f) => `${base}/pieces/${piece.slug}/${f}`;
     const toggle = () => (m.paused ? m.play().catch(() => {}) : m.pause());
     pp.addEventListener('click', toggle);
     if (m.tagName === 'VIDEO') m.addEventListener('click', toggle);
+    p.querySelector('.fs')?.addEventListener('click', () => {
+      if (document.fullscreenElement) document.exitFullscreen();
+      else if (p.requestFullscreen) p.requestFullscreen().catch(() => {});
+      else m.webkitEnterFullscreen?.();
+    });
     seek.addEventListener('input', () => {
       dragging = true;
       if (m.duration) m.currentTime = (seek.value / 1000) * m.duration;

@@ -9,5 +9,6 @@ const { kind, src } = Astro.props;
     <button type="button" class="pp" aria-label="Play" data-state="paused"></button>
     <input type="range" class="seek" min="0" max="1000" value="0" step="1" aria-label="Seek" />
     <span class="time">0:00 / 0:00</span>
+    {kind === 'video' && <button type="button" class="fs" aria-label="Fullscreen"></button>}
   </div>
 </div>

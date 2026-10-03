@@ -131,6 +131,10 @@ async function init(root) {
     if (a === 'out') zoom(-1);
     if (a === 'in') zoom(1);
     if (a === 'fit') zoom(0);
+    if (a === 'fs') {
+      if (document.fullscreenElement) document.exitFullscreen();
+      else root.requestFullscreen?.().catch(() => {});
+    }
   });
   new ResizeObserver(() => { if (!scroller.clientHeight) return; size(); pages.forEach((p) => { p.key = ''; }); update(); }).observe(scroller);
   size();
