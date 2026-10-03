@@ -25,7 +25,7 @@ Input: path to an `.mscz` file (ask if not given). Keep it token-cheap: run the 
    - Also writes `"parts": [...]` into `piece.json`: the parts in score staff order. Don't hand-edit it; re-run the export instead. The site lists tracks in that order, so no other file records voice order.
 4. **Edit `piece.json`**: set `title`, `composer`, `set`, `setOrder`, `tags`. Pieces sharing an identical `set` string are grouped on the home page.
 5. **Videos**: ask for the MuseScore-exported `.mp4` (video export is GUI-only; skip this step if none). Then:
-   - `python3 .claude/skills/new-score/part_videos.py "<video.mp4>" public/pieces/<slug> video-out/<slug>` → `full.mp4` + `<part>.mp4` (auto-measures the ~2.98s intro offset; ~5s, video not re-encoded).
+   - `python3 .claude/skills/new-score/part_videos.py "<video.mp4>" public/pieces/<slug> video-out/<slug>` → `full.mp4` + `<part>.mp4` (auto-measures the ~2.98s title-screen intro and cuts it; re-encodes, ~1 min).
    - `.claude/skills/new-score/upload_videos.sh <slug>` → uploads to the Cloudflare R2 bucket (needs rclone + `.env`, see `.env.example`; if missing, tell the user to follow README setup). The script passes `--s3-no-check-bucket`; without it every upload dies with `CreateBucket … 403 AccessDenied`, because R2 forbids bucket creation to a token scoped to that bucket.
    - In `piece.json` set `"videos": ["full", "soprano", ...]` (the tracks uploaded). URLs are derived as `<site.json videoBase>/<slug>/<track>.mp4`. Only list tracks that actually uploaded, otherwise the tabs 404.
 6. **Verify**: `npm run build`; confirm it passes.

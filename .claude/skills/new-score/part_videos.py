@@ -2,8 +2,8 @@
 """Build per-part MP4s from a MuseScore video export.
 Usage: part_videos.py <video.mp4> <piece_dir> <outdir>
 Writes full.mp4 and <part>.mp4 (all with faststart for web streaming).
-Replaces the video's audio with <piece_dir>/<part>.mp3 (and full.mp3), delayed by the
-intro offset, which is measured by cross-correlating full.mp3 with the video's audio."""
+Replaces the video's audio with <piece_dir>/<part>.mp3 (and full.mp3), and cuts the
+intro (title screen), whose length is measured by cross-correlating full.mp3 with the video's audio."""
 import glob, os, subprocess, sys
 import numpy as np
 
@@ -32,14 +32,10 @@ ms = round(i / SR * 1000)
 print(f'offset {ms} ms, correlation {corr:.3f}', file=sys.stderr)
 if corr < 0.9: sys.exit('Audio does not match the video well; check the exports are from the same score.')
 
-subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', video, '-vf', CROP, *X264,
-                '-c:a', 'copy', '-movflags', '+faststart', f'{out}/full.mp4'], check=True)
-print(f'{out}/full.mp4')
-
+# Cut the intro: start the video at the measured offset, so the MP3s line up from 0.
 for mp3 in sorted(glob.glob(f'{pdir}/*.mp3')):
     name = os.path.basename(mp3)[:-4]
-    if name == 'full': continue
-    subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', video, '-i', mp3, '-map', '0:v', '-map', '1:a',
-                    '-vf', CROP, *X264, '-movflags', '+faststart', '-af', f'adelay={ms}:all=1', '-c:a', 'aac', '-b:a', '192k', '-shortest',
+    subprocess.run(['ffmpeg', '-v', 'error', '-y', '-ss', f'{ms / 1000:.3f}', '-i', video, '-i', mp3, '-map', '0:v', '-map', '1:a',
+                    '-vf', CROP, *X264, '-movflags', '+faststart', '-c:a', 'aac', '-b:a', '192k', '-shortest',
                     f'{out}/{name}.mp4'], check=True)
     print(f'{out}/{name}.mp4')
