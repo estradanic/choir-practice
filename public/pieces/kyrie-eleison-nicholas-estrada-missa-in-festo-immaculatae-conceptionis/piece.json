@@ -1,0 +1,22 @@
+{
+  "title": "Kyrie Eleison",
+  "composer": "Nicholas Estrada",
+  "set": "Missa in Festo Immaculatae Conceptionis",
+  "setOrder": 0,
+  "tags": [
+    "Mass"
+  ],
+  "videos": [
+    "full",
+    "soprano",
+    "alto",
+    "tenor",
+    "bass"
+  ],
+  "parts": [
+    "soprano",
+    "alto",
+    "tenor",
+    "bass"
+  ]
+}
