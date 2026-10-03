@@ -9,6 +9,8 @@ const ver = site.videoVersion ? `?v=${site.videoVersion}` : '';
 // Fallback for pieces whose piece.json has no "parts" (export.py records the score's
 // staff order there, which is what normally drives the track order).
 const order = ['soprano', 'alto', 'tenor', 'baritone', 'bass'];
+// Pre-rendered slowed copies live in <piece>/speeds/<speed>/ (see slow_audio.py).
+const slowSpeeds = ['0.75', '0.875'];
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
 export function getPieces() {
@@ -29,6 +31,11 @@ export function getPieces() {
           .filter((n) => n !== 'full' && n !== 'score')
       );
       videos.forEach((n) => n !== 'full' && names.add(n));
+      const slow = (n) => {
+        const o = {};
+        slowSpeeds.forEach((s) => { if (fs.existsSync(path.join(dir, 'speeds', s, `${n}.mp3`))) o[s] = `speeds/${s}/${n}.mp3`; });
+        return Object.keys(o).length ? o : null;
+      };
       const vid = (n) => (videos.has(n) ? `${videoBase}/${d.name}/${n}.mp4${ver}` : null);
       // Tracks follow the score's staff order (meta.parts), then the fallback list.
       const staff = meta.parts || [];
@@ -42,6 +49,7 @@ export function getPieces() {
           key: n,
           label: cap(n),
           audio: has(`${n}.mp3`) ? `${n}.mp3` : null,
+          slow: slow(n),
           pdf: has('score.pdf') ? 'score.pdf' : null,
           video: vid(n),
         }));
@@ -49,6 +57,7 @@ export function getPieces() {
         key: 'full',
         label: 'Full choir',
         audio: has('full.mp3') ? 'full.mp3' : null,
+        slow: slow('full'),
         pdf: has('score.pdf') ? 'score.pdf' : null,
         video: vid('full'),
       };

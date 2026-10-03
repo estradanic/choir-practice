@@ -11,6 +11,7 @@ const synced = !!piece.tracks[0].video;
 // Scores are always US Letter, so the layout doesn't need to wait for the PDF to load.
 const pa = piece.tracks.some((t) => t.pdf) ? 8.5 / 11 : null;
 const file = (f) => `${base}/pieces/${piece.slug}/${f}`;
+const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries(t.slow).map(([k, v]) => [k, file(v)]))) : undefined);
 ---
 <Layout title={piece.title} wide>
   {pa && <script is:inline define:vars={{ pa }}>document.documentElement.style.setProperty('--pa', pa); window.__paSet = true;</script>}
@@ -20,7 +21,7 @@ const file = (f) => `${base}/pieces/${piece.slug}/${f}`;
   </div>
   {!synced && <nav class="tabs" role="tablist" >
     {piece.tracks.map((t, i) => (
-      <button role="tab" data-tab={t.key} data-audio={t.audio ? file(t.audio) : undefined} data-video={t.video || undefined} data-name={`${piece.slug}-${t.key}.mp3`} aria-selected={i === 0 ? 'true' : 'false'}>{t.label}</button>
+      <button role="tab" data-tab={t.key} data-audio={t.audio ? file(t.audio) : undefined} data-slow={slowOf(t)} data-video={t.video || undefined} data-name={`${piece.slug}-${t.key}.mp3`} aria-selected={i === 0 ? 'true' : 'false'}>{t.label}</button>
     ))}
   </nav>}
   {piece.tracks.filter((_, i) => !synced || i === 0).map((t, i) => (
@@ -30,7 +31,7 @@ const file = (f) => `${base}/pieces/${piece.slug}/${f}`;
         <section class="box">
           <h2><span>Audio</span><button type="button" class="min" aria-label="Minimize Audio" aria-expanded="true"></button></h2>
           <div class="body">
-          <Player kind="audio" src={file(t.audio)} />
+          <Player kind="audio" src={file(t.audio)} slow={t.slow && Object.fromEntries(Object.entries(t.slow).map(([k, v]) => [k, file(v)]))} />
           <p class="actions">
             <a class="btn" href={file(t.audio)} download={`${piece.slug}-${t.key}.mp3`}>Download audio</a>
           </p>
@@ -44,7 +45,7 @@ const file = (f) => `${base}/pieces/${piece.slug}/${f}`;
           <Player kind="video" src={t.video}>
             <nav class="tabs" role="tablist" data-synced>
               {piece.tracks.map((x, j) => (
-                <button type="button" role="tab" data-tab={x.key} data-audio={x.audio ? file(x.audio) : undefined} data-video={x.video || undefined} data-name={`${piece.slug}-${x.key}.mp3`} aria-selected={j === 0 ? 'true' : 'false'}>{x.label}</button>
+                <button type="button" role="tab" data-tab={x.key} data-audio={x.audio ? file(x.audio) : undefined} data-slow={slowOf(x)} data-video={x.video || undefined} data-name={`${piece.slug}-${x.key}.mp3`} aria-selected={j === 0 ? 'true' : 'false'}>{x.label}</button>
               ))}
             </nav>
           </Player>
@@ -82,6 +83,7 @@ const file = (f) => `${base}/pieces/${piece.slug}/${f}`;
               <button type="button" class="fs" data-act="fs" aria-label="Fullscreen"></button>
             </div>
             <div class="pages" tabindex="0" aria-label={`${t.label} score`}></div>
+            <div class="loading" role="progressbar" aria-label="Loading score"><span class="lt">Loading score… 0%</span><div class="track"><i></i></div></div>
             <p class="fallback">Can't see the score? Use the buttons below to open or download it.</p>
           </div>
           <p class="actions">
@@ -137,6 +139,45 @@ const file = (f) => `${base}/pieces/${piece.slug}/${f}`;
       paint();
     });
     seek.addEventListener('change', () => { dragging = false; paint(); });
+    // Audio with pre-rendered slow copies swaps files instead of stretching in the browser.
+    const SPEEDS = [0.75, 0.875, 1];
+    const slow = p.dataset.slow ? JSON.parse(p.dataset.slow) : null;
+    const orig = m.getAttribute('src');
+    const sv = p.querySelector('.sv');
+    const sb = p.querySelectorAll('[data-spd]');
+    let sp = 1;
+    m.preservesPitch = true;
+    const stretch = (s) => (m.tagName === 'AUDIO' && slow?.[s] ? s : 1);
+    const shown = () => {
+      const i = SPEEDS.indexOf(sp);
+      sv.textContent = `${sp}×`;
+      sb[0].disabled = i === 0;
+      sb[1].disabled = i === SPEEDS.length - 1;
+    };
+    p.speed = () => sp;
+    p.setSpeed = (s) => {
+      if (s === sp) return;
+      const old = sp;
+      sp = s;
+      shown();
+      if (m.tagName === 'VIDEO') { m.playbackRate = s; return; }
+      const t = (m.currentTime * stretch(old)) / stretch(s);
+      const playing = !m.paused;
+      const url = (s !== 1 && slow?.[s]) || orig;
+      if (m.getAttribute('src') !== url) {
+        m.src = url;
+        m.addEventListener('loadedmetadata', () => {
+          m.currentTime = t;
+          if (playing) m.play().catch(() => {});
+        }, { once: true });
+      }
+      m.defaultPlaybackRate = m.playbackRate = s / stretch(s);
+    };
+    sb.forEach((b) => b.addEventListener('click', () => {
+      const i = SPEEDS.indexOf(sp);
+      p.setSpeed(SPEEDS[Math.max(0, Math.min(SPEEDS.length - 1, i + Number(b.dataset.spd)))]);
+    }));
+    shown();
     ['timeupdate', 'loadedmetadata', 'durationchange', 'seeked'].forEach((e) => m.addEventListener(e, paint));
     ['play', 'pause', 'ended'].forEach((e) => m.addEventListener(e, state));
   });
@@ -223,6 +264,7 @@ const file = (f) => `${base}/pieces/${piece.slug}/${f}`;
     const t = from.currentTime;
     const play = !from.paused;
     from.pause();
+    to.closest('.player')?.setSpeed?.(from.closest('.player')?.speed?.() ?? 1);
     const go = () => {
       to.currentTime = t;
       if (play) to.play().catch(() => {});
@@ -246,13 +288,20 @@ const file = (f) => `${base}/pieces/${piece.slug}/${f}`;
   if (synced) {
     const v = document.querySelector('.player video');
     v.muted = true;
+    const slowMap = {};
+    let sp = 1;
     tabs.forEach((t) => {
       if (!t.dataset.audio) return;
       const a = new Audio();
       a.preload = 'auto';
       a.src = t.dataset.audio;
+      a.dataset.orig = t.dataset.audio;
       aud[t.dataset.tab] = a;
+      slowMap[t.dataset.tab] = t.dataset.slow ? JSON.parse(t.dataset.slow) : {};
     });
+    // Slowed parts are pre-rendered files, so their clock runs fac times longer than the video's.
+    const fac = (k) => (sp !== 1 && slowMap[k][sp] ? sp : 1);
+    const pos = (k) => v.currentTime / fac(k);
     // Crossfade between parts with Web Audio gain ramps (smoother than ramping element volume,
     // and it also works on iOS). Without Web Audio, fall back to a hard mute.
     let active = tabs[0].dataset.tab;
@@ -283,18 +332,44 @@ const file = (f) => `${base}/pieces/${piece.slug}/${f}`;
     v.addEventListener('play', () => { graph(); ctx?.resume(); }, { capture: true });
     const all = () => Object.values(aud);
     // Seeking the audible part makes a click, so it gets a looser tolerance than the silent ones.
-    const off = (k, a) => Math.abs(a.currentTime - v.currentTime) > (k === active ? 0.25 : 0.03);
+    const off = (k, a) => Math.abs(a.currentTime - pos(k)) > (k === active ? 0.25 : 0.03);
     const resume = () => Object.entries(aud).forEach(([k, a]) => {
-      if (off(k, a)) a.currentTime = v.currentTime;
+      if (off(k, a)) a.currentTime = pos(k);
       if (a.paused) a.play().catch(() => {});
     });
+    // Speed change: stop, swap every part to the matching file, line them all up, then carry on.
+    let gen = 0;
+    let wasPlaying = null;
+    const rate = async () => {
+      if (v.playbackRate === sp) return;
+      sp = v.playbackRate;
+      const my = ++gen;
+      if (wasPlaying === null) wasPlaying = !v.paused;
+      v.pause();
+      await Promise.all(Object.entries(aud).map(([k, a]) => new Promise((done) => {
+        const url = (sp !== 1 && slowMap[k][sp]) || a.dataset.orig;
+        a.preservesPitch = true;
+        if (a.getAttribute('src') !== url) {
+          a.src = url;
+          a.addEventListener('loadedmetadata', done, { once: true });
+          setTimeout(done, 8000);
+        } else done();
+        a.defaultPlaybackRate = a.playbackRate = sp / fac(k);
+      })));
+      if (my !== gen) return;
+      Object.entries(aud).forEach(([k, a]) => { a.currentTime = pos(k); });
+      const go = wasPlaying;
+      wasPlaying = null;
+      if (go) v.play().catch(() => {});
+    };
+    v.addEventListener('ratechange', rate);
     v.addEventListener('play', resume);
     v.addEventListener('playing', resume);
     ['pause', 'waiting', 'ended'].forEach((e) => v.addEventListener(e, () => all().forEach((a) => a.pause())));
-    v.addEventListener('seeked', () => all().forEach((a) => { a.currentTime = v.currentTime; }));
+    v.addEventListener('seeked', () => Object.entries(aud).forEach(([k, a]) => { a.currentTime = pos(k); }));
     setInterval(() => {
       if (v.paused || v.seeking) return;
-      Object.entries(aud).forEach(([k, a]) => { if (off(k, a)) a.currentTime = v.currentTime; });
+      Object.entries(aud).forEach(([k, a]) => { if (off(k, a)) a.currentTime = pos(k); });
     }, 500);
   }
   tabs.forEach((tab) => tab.addEventListener('click', () => {

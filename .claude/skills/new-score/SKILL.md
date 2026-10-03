@@ -23,6 +23,7 @@ Input: path to an `.mscz` file (ask if not given). Keep it token-cheap: run the 
    - No part PDFs by design: everyone uses the same full score PDF.
    - Uses `mscore4portable` on PATH (override with `--mscore PATH`).
    - Also writes `"parts": [...]` into `piece.json`: the parts in score staff order. Don't hand-edit it; re-run the export instead. The site lists tracks in that order, so no other file records voice order.
+   - Then `python3 .claude/skills/new-score/slow_audio.py public/pieces/<slug>` → pre-rendered 0.75× and 0.875× copies (pitch preserved, ffmpeg `rubberband`) in `speeds/<speed>/`. The site's speed buttons swap to these (browser time-stretching sounds bad); ~2.5× the MP3 size, a minute or so. Re-run with `--force` if MP3s are re-exported.
 4. **Edit `piece.json`**: set `title`, `composer`, `set`, `setOrder`, `tags`. Pieces sharing an identical `set` string are grouped on the home page.
 5. **Videos**: ask for the MuseScore-exported `.mp4` (video export is GUI-only; skip this step if none). Then:
    - `python3 .claude/skills/new-score/part_videos.py "<video.mp4>" public/pieces/<slug> video-out/<slug>` → `full.mp4` + `<part>.mp4` (auto-measures the ~2.98s title-screen intro and cuts it; re-encodes, ~1 min).

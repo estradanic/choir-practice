@@ -1,7 +1,7 @@
 ---
-const { kind, src } = Astro.props;
+const { kind, src, slow } = Astro.props;
 ---
-<div class="player">
+<div class="player" data-slow={slow ? JSON.stringify(slow) : undefined}>
   {kind === 'video'
     ? <video class="video" playsinline preload="auto" src={src}></video>
     : <audio preload="auto" src={src}></audio>}
@@ -9,6 +9,11 @@ const { kind, src } = Astro.props;
     <button type="button" class="pp" aria-label="Play" data-state="paused"></button>
     <input type="range" class="seek" min="0" max="1000" value="0" step="1" aria-label="Seek" />
     <span class="time">0:00 / 0:00</span>
+    <span class="speed" role="group" aria-label="Playback speed">
+      <button type="button" data-spd="-1" aria-label="Slower">–</button>
+      <span class="time sv">1×</span>
+      <button type="button" data-spd="1" aria-label="Faster">+</button>
+    </span>
     {kind === 'video' && <button type="button" class="fs" aria-label="Fullscreen"></button>}
   </div>
   <slot />

@@ -9,8 +9,23 @@ async function init(root) {
   const scroller = root.querySelector('.pages');
   const label = root.querySelector('.pg');
   const bar = root.querySelector('.bar');
+  const ld = root.querySelector('.loading');
+  const lt = ld.querySelector('.lt');
+  const fill = ld.querySelector('i');
+  const setPct = (p) => {
+    p = Math.max(0, Math.min(100, Math.round(p)));
+    lt.textContent = `Loading score… ${p}%`;
+    ld.setAttribute('aria-valuenow', p);
+    const room = fill.parentElement.clientWidth - 4;
+    fill.style.width = `${Math.floor((room * p) / 100 / 12) * 12}px`;
+  };
+  setPct(0);
   const pdfjs = await load();
-  const doc = await pdfjs.getDocument({ url: root.dataset.src }).promise;
+  setPct(20);
+  const task = pdfjs.getDocument({ url: root.dataset.src });
+  task.onProgress = ({ loaded, total }) => { if (total) setPct(20 + (loaded / total) * 70); };
+  const doc = await task.promise;
+  setPct(95);
   let zi = 2;
   let cur = 0;
   const pages = [];
@@ -54,7 +69,7 @@ async function init(root) {
     c.width = Math.floor(vp.width);
     c.height = Math.floor(vp.height);
     await p.page.render({ canvasContext: c.getContext('2d'), viewport: vp, canvas: c }).promise;
-    if (p.key === key) p.wrap.replaceChildren(c);
+    if (p.key === key) { p.wrap.replaceChildren(c); ld.classList.add('done'); }
   };
 
   const left = (i) => pages[i].wrap.offsetLeft - 8;
