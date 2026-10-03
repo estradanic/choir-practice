@@ -362,6 +362,11 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
         if (u[0] === 0x49 && u[1] === 0x44 && u[2] === 0x33) o = 10 + (((u[6] & 127) << 21) | ((u[7] & 127) << 14) | ((u[8] & 127) << 7) | (u[9] & 127));
         const fr = [];
         let rate = 32000;
+        // An encoder info frame (Xing/Info, written by ffmpeg/LAME) isn't audio: skip it, and use
+        // its encoder delay so times line up with how a whole-file decode trims the start.
+        let skip = -1;
+        let delay = 0;
+        let pad = 0;
         while (o + 4 <= u.length) {
           if (u[o] !== 0xff || (u[o + 1] & 0xe0) !== 0xe0 || ((u[o + 1] >> 3) & 3) !== 3 || ((u[o + 1] >> 1) & 3) !== 1) { o++; continue; }
           const br = BR[u[o + 2] >> 4] * 1000;
@@ -370,12 +375,27 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
           const len = Math.floor((144 * br) / s) + ((u[o + 2] >> 1) & 1);
           if (o + len > u.length) break;
           rate = s;
+          if (skip < 0) {
+            skip = 0;
+            const side = ((u[o + 3] >> 6) === 3 ? 17 : 32) + 4;
+            const tag = String.fromCharCode(...u.slice(o + side, o + side + 4));
+            if (tag === 'Xing' || tag === 'Info') {
+              const l = o + side + 120;
+              delay = (u[l + 21] << 4) | (u[l + 22] >> 4);
+              pad = ((u[l + 22] & 15) << 8) | u[l + 23];
+              delay += 529;
+              o += len;
+              continue;
+            }
+          }
           fr.push(o);
           o += len;
         }
         fr.push(o);
         const n = fr.length - 1;
-        return { u, fr, n, fd: 1152 / rate, dur: (n * 1152) / rate };
+        const fd = 1152 / rate;
+        const off = delay / rate;
+        return { u, fr, n, fd, off, dur: n * fd - off - pad / rate };
       };
       const idx = {};
       const idxv = {};
@@ -398,9 +418,9 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
         let w;
         if (!x.n) w = { buf: await mono(await ctx.decodeAudioData(x.u.slice().buffer)), t0: 0 };
         else {
-          const fa = Math.max(0, Math.floor((j.i * WIN) / x.fd) - PRE);
-          const f1 = Math.min(x.n, Math.ceil(((j.i + 1) * WIN + OV) / x.fd));
-          w = { buf: await mono(await ctx.decodeAudioData(x.u.slice(x.fr[fa], x.fr[f1]).buffer)), t0: fa * x.fd };
+          const fa = Math.max(0, Math.floor((j.i * WIN + x.off) / x.fd) - PRE);
+          const f1 = Math.min(x.n, Math.ceil(((j.i + 1) * WIN + OV + x.off) / x.fd));
+          w = { buf: await mono(await ctx.decodeAudioData(x.u.slice(x.fr[fa], x.fr[f1]).buffer)), t0: fa * x.fd - x.off };
         }
         log('decoded', j.id, Math.round(performance.now() - t), 'ms');
         return w;
@@ -491,7 +511,7 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
         const bufEnd = w.t0 + w.buf.duration;
         const nominal = x.n ? (wi + 1) * WIN + OV : Infinity;
         const end = Math.min(nominal, bufEnd);
-        const last = !x.n || bufEnd < nominal - 0.02 || end >= x.dur - 0.05;
+        const last = !x.n || end >= x.dur - 0.05;
         const span = end - ft;
         if (span < 0.02) return false;
         const src = ctx.createBufferSource();
@@ -505,6 +525,8 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
         src.connect(gs).connect(vo.g);
         src.start(when, ft - w.t0, span);
         vo.segs.push(src);
+        vo.until = when + dur;
+        if (last) log('lastseg', vo.k, 'win', wi, 'ft', ft.toFixed(3), 'end', end.toFixed(3), 'bufEnd', bufEnd.toFixed(3), 'dur', x.dur.toFixed(2));
         vo.joined = true;
         vo.last = last;
         vo.nextI = wi + 1;
@@ -542,6 +564,14 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
         const now = ctx.currentTime;
         // Safety net: if the selected part isn't playing for any reason, start it.
         if (playing && urls[active] && !voices[active] && starting[active] === undefined) { log('remount', active); mount(); }
+        // If the selected part has run out of scheduled audio before the end of the piece, restart it.
+        const cur = voices[active];
+        if (playing && cur && !cur.done && cur.until < now - 0.05 && pos() / cur.inf.f < cur.x.dur - 0.2) {
+          log('gap', active, 'last', cur.last, 'nextFt', cur.nextFt?.toFixed(3), 'nextWhen', cur.nextWhen?.toFixed(3), 'until', cur.until.toFixed(3), 'now', now.toFixed(3), 'busy', busy, 'jobs', Object.keys(jobs).join(','));
+          stopVoice(cur);
+          delete voices[active];
+          mount();
+        }
         Object.values(voices).forEach((vo) => {
           while (!vo.done && !vo.last && vo.nextWhen - now < 3) {
             let when = vo.nextWhen;
