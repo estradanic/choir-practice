@@ -495,7 +495,10 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
         if (!(l > 0.005)) l = ctx.outputLatency > 0.005 ? ctx.outputLatency : lat;
         return Math.min(Math.max(l, 0), 1);
       };
-      const heard = () => posAt(ctx.currentTime - lat);
+      // Browsers don't report Bluetooth delay, so aim for the sound to lead the picture slightly:
+      // about right for wired/speakers and tolerable on Bluetooth.
+      const BIAS = 0.05;
+      const heard = () => posAt(ctx.currentTime - lat) - BIAS;
       const stopVoice = (vo, at = ctx.currentTime) => {
         vo.done = true;
         vo.g.gain.cancelScheduledValues(at);
@@ -616,7 +619,7 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
         lat = readLat();
         log('begin', 'v', v.currentTime.toFixed(2), 'lat', lat.toFixed(3));
         t0 = ctx.currentTime + LEAD;
-        m0 = v.currentTime + (LEAD + lat) * sp;
+        m0 = v.currentTime + (LEAD + lat) * sp + BIAS;
         playing = true;
         mount();
       };
@@ -672,7 +675,7 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
           lastFix = now;
           log('RESYNC audio behind', err.toFixed(3));
           const when = ctx.currentTime + LEAD;
-          m0 = v.currentTime + (LEAD + lat) * sp;
+          m0 = v.currentTime + (LEAD + lat) * sp + BIAS;
           t0 = when;
           epoch++;
           stopAll(when);
@@ -687,7 +690,7 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
           return;
         }
         const k = Math.abs(err) > 0.2 ? 0.2 : 0.08;
-        const want = Math.abs(err) > 0.05 ? sp * (1 + Math.max(-k, Math.min(k, err))) : sp;
+        const want = Math.abs(err) > 0.03 ? sp * (1 + Math.max(-k, Math.min(k, err))) : sp;
         if (Math.abs(v.playbackRate - want) > 0.004) v.playbackRate = want;
       }, 200);
       let gen = 0;
