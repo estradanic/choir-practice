@@ -195,7 +195,17 @@ const file = (f) => `${base}/pieces/${piece.slug}/${f}`;
     const need = media.getBoundingClientRect().width + 16 + score.getBoundingClientRect().width + 18;
     if (need > innerWidth - 24) mobile();
   };
-  addEventListener('resize', fit);
+  // Only recalculate when the change can matter: any size change in desktop mode, but just
+  // width in one-column mode. Phone address bars resize the height while you scroll.
+  let lw = innerWidth;
+  let lh = innerHeight;
+  addEventListener('resize', () => {
+    const desk = root.classList.contains('desk');
+    const need = innerWidth !== lw || (desk && innerHeight !== lh);
+    lw = innerWidth;
+    lh = innerHeight;
+    if (need) fit();
+  });
   const reveal = () => root.classList.remove('pre');
   addEventListener('refit', () => { fit(); reveal(); });
   fit();
