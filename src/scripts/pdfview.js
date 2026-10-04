@@ -1,9 +1,94 @@
 import workerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url';
 
+// The scrollbar track is a tile of one grey dot per 2x2 block, built in whole device pixels so it
+// stays crisp and evenly spaced whatever the display scaling or browser zoom is.
+const dots = () => {
+  const dpr = window.devicePixelRatio || 1;
+  const d = Math.max(1, Math.round(dpr));
+  const c = document.createElement('canvas');
+  c.width = c.height = d * 2;
+  const g = c.getContext('2d');
+  g.fillStyle = '#fff';
+  g.fillRect(0, 0, d * 2, d * 2);
+  g.fillStyle = '#909090';
+  g.fillRect(0, 0, d, d);
+  const st = document.documentElement.style;
+  st.setProperty('--wsb-bg', `url(${c.toDataURL()})`);
+  st.setProperty('--wsb-sz', `${(d * 2) / dpr}px`);
+};
+dots();
+addEventListener('resize', dots);
+
 let lib;
 const load = () => (lib ||= import('pdfjs-dist/legacy/build/pdf.min.mjs').then((m) => { m.GlobalWorkerOptions.workerSrc = workerUrl; return m; }));
 
 const ZOOMS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3];
+
+// An old-school scrollbar (arrow buttons, dithered track, raised thumb) for a scrolling box, in
+// place of the browser's. The horizontal one sits under the box; the vertical one floats over its
+// right edge and only appears when the content is taller than the box.
+function winScroll(scroller, axis) {
+  const v = axis === 'y';
+  const el = document.createElement('div');
+  el.className = `wsb ${v ? 'wsb-v' : 'wsb-h'}`;
+  el.hidden = true;
+  el.innerHTML = '<button type="button" class="wsb-a wsb-1" tabindex="-1" aria-label="Scroll back"></button><div class="wsb-t"><div class="wsb-th"></div></div><button type="button" class="wsb-a wsb-2" tabindex="-1" aria-label="Scroll forward"></button>';
+  if (v) scroller.parentElement.append(el);
+  else {
+    // The page reserves this space up front (see .wsb-ph) so nothing shifts when the bar appears.
+    const ph = scroller.parentElement.nextElementSibling;
+    if (ph?.classList.contains('wsb-ph')) ph.replaceWith(el);
+    else scroller.parentElement.after(el);
+  }
+  const [b1, track, b2] = el.children;
+  const thumb = track.firstElementChild;
+  const pos = v ? 'scrollTop' : 'scrollLeft';
+  const total = () => (v ? scroller.scrollHeight : scroller.scrollWidth);
+  const vis = () => (v ? scroller.clientHeight : scroller.clientWidth);
+  const room = () => (v ? track.clientHeight : track.clientWidth);
+  const len = () => Math.max(16, (room() * vis()) / total());
+  const sync = () => {
+    const over = total() > vis() + 1;
+    el.hidden = !over;
+    if (!over) return;
+    const l = len();
+    thumb.style[v ? 'height' : 'width'] = `${l}px`;
+    thumb.style[v ? 'top' : 'left'] = `${(room() - l) * (scroller[pos] / (total() - vis()))}px`;
+  };
+  scroller.addEventListener('scroll', sync);
+  new ResizeObserver(sync).observe(scroller);
+  new MutationObserver(sync).observe(scroller, { childList: true, subtree: true, attributes: true, attributeFilter: ['style'] });
+  const hold = (btn, dir) => btn.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    const step = () => scroller.scrollBy({ [v ? 'top' : 'left']: dir * 48 });
+    step();
+    let t = setTimeout(() => { t = setInterval(step, 50); }, 350);
+    const stop = () => { clearTimeout(t); clearInterval(t); removeEventListener('pointerup', stop); removeEventListener('pointercancel', stop); };
+    addEventListener('pointerup', stop);
+    addEventListener('pointercancel', stop);
+  });
+  hold(b1, -1);
+  hold(b2, 1);
+  track.addEventListener('pointerdown', (e) => {
+    if (e.target !== track) return;
+    const r = thumb.getBoundingClientRect();
+    const before = v ? e.clientY < r.top : e.clientX < r.left;
+    scroller.scrollBy({ [v ? 'top' : 'left']: (before ? -1 : 1) * vis() * 0.9, behavior: 'smooth' });
+  });
+  thumb.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    thumb.setPointerCapture(e.pointerId);
+    const start = v ? e.clientY : e.clientX;
+    const from = scroller[pos];
+    const snap = scroller.style.scrollSnapType;
+    scroller.style.scrollSnapType = 'none';
+    const move = (m) => { scroller[pos] = from + (((v ? m.clientY : m.clientX) - start) * (total() - vis())) / Math.max(1, room() - len()); };
+    const up = () => { thumb.removeEventListener('pointermove', move); thumb.removeEventListener('pointerup', up); scroller.style.scrollSnapType = snap; };
+    thumb.addEventListener('pointermove', move);
+    thumb.addEventListener('pointerup', up);
+  });
+  sync();
+}
 
 async function init(root) {
   const scroller = root.querySelector('.pages');
@@ -155,6 +240,8 @@ async function init(root) {
       else root.requestFullscreen?.().catch(() => {});
     }
   });
+  winScroll(scroller, 'x');
+  winScroll(scroller, 'y');
   new ResizeObserver(() => { if (!scroller.clientHeight) return; size(); pages.forEach((p) => { p.key = ''; }); update(); }).observe(scroller);
   size();
   update();
