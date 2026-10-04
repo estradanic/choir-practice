@@ -726,6 +726,50 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
       setActive = (k) => { log('tab', k, 'v', v.currentTime.toFixed(2), 'heard', heard().toFixed(2)); active = k; mount(); warmBytes(); maintain(); };
       warmBytes();
       setInterval(() => { advance(); maintain(); }, 250);
+      // Don't start until every part is downloaded and its first window decoded; otherwise the
+      // sound arrives seconds after the picture. Play and the speed buttons stay disabled until then
+      // (changing speed would restart the loading at the new speed's files).
+      const box = document.createElement('div');
+      box.className = 'vload';
+      box.setAttribute('role', 'progressbar');
+      box.setAttribute('aria-label', 'Loading audio');
+      box.innerHTML = '<span class="lt">Loading audio… 0%</span><div class="track"><i></i></div>';
+      vp.style.position = 'relative';
+      v.after(box);
+      const pp = vp.querySelector('.pp');
+      const spd = vp.querySelectorAll('[data-spd]');
+      pp.disabled = true;
+      spd.forEach((b) => { b.disabled = true; });
+      const lt = box.querySelector('.lt');
+      const fill = box.querySelector('i');
+      const nativePlay = v.play.bind(v);
+      let open = false;
+      const unlockPlay = () => {
+        open = true;
+        box.classList.add('done');
+        pp.disabled = false;
+        const i = [0.75, 0.875, 1].indexOf(vp.speed());
+        spd[0].disabled = i === 0;
+        spd[1].disabled = i === 2;
+        log('gate open');
+      };
+      v.play = () => (open ? nativePlay() : Promise.resolve());
+      const gate = setInterval(() => {
+        const m = pos();
+        let got = 0;
+        keys.forEach((k) => {
+          const x = idxv[`${sp}/${k}`];
+          if (!x) return;
+          got += 1;
+          if (ready[`${sp}/${k}/${winOf(x, m / info(sp, k).f)}`]) got += 1;
+        });
+        const total = keys.length * 2;
+        const pct = Math.round((got / total) * 100);
+        lt.textContent = `Loading audio… ${pct}%`;
+        box.setAttribute('aria-valuenow', pct);
+        fill.style.width = `${Math.floor(((fill.parentElement.clientWidth - 4) * pct) / 100 / 12) * 12}px`;
+        if (got >= total || performance.now() - T0 > 30000) { clearInterval(gate); unlockPlay(); }
+      }, 100);
     }
     if (!ctx) setActive = (k) => { active = k; };
   }

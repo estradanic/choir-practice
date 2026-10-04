@@ -34,6 +34,7 @@ const { title, wide } = Astro.props;
       .pp::before { content: ""; position: absolute; left: 50%; top: 50%; background: #000; transform: translate(-50%, -50%); }
       .pp[data-state=paused]::before { width: 10px; height: 12px; clip-path: polygon(0 0, 100% 50%, 0 100%); margin-left: 1px; }
       .pp[data-state=playing]::before { width: 10px; height: 12px; background: linear-gradient(90deg, #000 0 3px, transparent 3px 7px, #000 7px); }
+      .pp:disabled::before { background: var(--mid); }
       .pp:active, .min:active { padding: 0; }
       .pp:active::before { margin-top: 1px; margin-left: 2px; }
       .fs { position: relative; flex: none; width: 30px; height: 26px; padding: 0; }
@@ -89,11 +90,12 @@ const { title, wide } = Astro.props;
       .pdfpage { flex: none; margin: auto 0; background: #fff; box-shadow: 1px 1px 0 var(--dark); scroll-snap-align: start; }
       .pdfpage canvas { display: block; width: 100%; height: 100%; }
       .pdfview { position: relative; }
-      .pdfview .loading { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(260px, 80%); padding: 10px; background: var(--face); box-shadow: var(--raised); text-align: center; }
-      .pdfview .loading.done { display: none; }
-      .pdfview .loading .lt { display: block; margin-bottom: 8px; }
-      .pdfview .loading .track { height: 18px; padding: 2px; background: #fff; box-shadow: var(--sunken); }
-      .pdfview .loading i { display: block; height: 100%; width: 0; background: repeating-linear-gradient(90deg, #000080 0 10px, transparent 10px 12px); }
+      .pdfview .loading, .vload { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(260px, 80%); padding: 10px; background: var(--face); box-shadow: var(--raised); text-align: center; }
+      .vload { top: 40%; z-index: 2; }
+      .pdfview .loading.done, .vload.done { display: none; }
+      .pdfview .loading .lt, .vload .lt { display: block; margin-bottom: 8px; }
+      .pdfview .loading .track, .vload .track { height: 18px; padding: 2px; background: #fff; box-shadow: var(--sunken); }
+      .pdfview .loading i, .vload i { display: block; height: 100%; width: 0; background: repeating-linear-gradient(90deg, #000080 0 10px, transparent 10px 12px); }
       .pdfview.failed .loading { display: none; }
       .pdfview .fallback { display: none; }
       .pdfview.failed .fallback { display: block; }
