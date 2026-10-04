@@ -8,6 +8,7 @@ export function getStaticPaths() {
 const { piece } = Astro.props;
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 const synced = !!piece.tracks[0].video;
+const mixParts = piece.tracks.filter((x, j) => j > 0 && x.audio);
 // Neighbours within the piece's set, in the same order the home page lists them.
 const sibs = piece.set
   ? getPieces().filter((p) => p.set === piece.set).sort((a, b) => a.setOrder - b.setOrder || a.title.localeCompare(b.title))
@@ -62,7 +63,25 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
               {piece.tracks.map((x, j) => (
                 <button type="button" role="tab" data-tab={x.key} data-audio={x.audio ? file(x.audio) : undefined} data-slow={slowOf(x)} data-video={x.video || undefined} data-name={`${piece.slug}-${x.key}.mp3`} aria-selected={j === 0 ? 'true' : 'false'}>{x.label}</button>
               ))}
+              {mixParts.length > 1 && <button type="button" role="tab" data-tab="custom" aria-selected="false">Custom</button>}
             </nav>
+            {mixParts.length > 1 && (
+              <div class="mixer" data-open="1" hidden>
+                <button type="button" class="mxopen" aria-label="Restore mixer" title="Restore Custom Mix"></button>
+                <div class="mxpanel" role="group" aria-label="Custom mix">
+                  <div class="mxbar"><span>Custom Mix</span><button type="button" class="mxclose" aria-label="Minimize mixer" title="Minimize"></button></div>
+                  <div class="mxrows">
+                    {mixParts.map((x) => (
+                      <div class="mrow" data-k={x.key}>
+                        <div class="vs"><input type="range" class="mv" min="0" max="100" value="75" aria-orientation="vertical" aria-label={`${x.label} volume`} /></div>
+                        <label><input type="checkbox" checked /><span>{x.label}</span></label>
+                      </div>
+                    ))}
+                  </div>
+                  <div class="mxfoot"><button type="button" class="mxreset" title="Set every part back to 75%">Reset</button></div>
+                </div>
+              </div>
+            )}
           </Player>
           <p class="actions">
             <a class="btn" id="dl-video" href={t.video} target="_blank" rel="noopener">Download video</a>
@@ -297,6 +316,13 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
   // only changes which one is unmuted (no seeking, no reloading).
   const synced = document.querySelector('nav.tabs[data-synced]');
   let setActive = () => {};
+  let applyMix = () => {};
+  // The chosen part (or Custom mix) is remembered for the browser session, so the next piece opens the same way.
+  let mixState = {};
+  try { mixState = JSON.parse(sessionStorage.getItem('cpmix')) || {}; } catch {}
+  mixState = { sel: mixState.sel || '', vols: mixState.vols || {}, on: mixState.on || {} };
+  const DEFVOL = 0.75;
+  const saveMix = () => { try { sessionStorage.setItem('cpmix', JSON.stringify(mixState)); } catch {} };
   const dlVideo = document.getElementById('dl-video');
   const dlAudio = document.getElementById('dl-audio');
   if (synced) {
@@ -308,6 +334,18 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
     });
     const keys = Object.keys(urls);
     let active = tabs[0].dataset.tab;
+    // Which parts sound, and how loud: one part at full volume, or the Custom mix.
+    const wantMix = () => {
+      const o = {};
+      if (active === 'custom') {
+        keys.filter((k) => k !== 'full').forEach((k) => {
+          const g = mixState.on[k] === false ? 0 : (mixState.vols[k] ?? DEFVOL);
+          if (g > 0) o[k] = g;
+        });
+      } else if (urls[active]) o[active] = 1;
+      return o;
+    };
+    const wantKeys = () => [...new Set([...Object.keys(wantMix()), ...keys])];
     let ctx = null;
     try { ctx = new AudioContext(); } catch {}
     // Parts are decoded into memory and played as Web Audio buffer sources on the audio clock:
@@ -470,15 +508,15 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
       };
       const winOf = (x, ft) => (x.n ? Math.floor(ft / WIN) : 0);
       const warmBytes = () => {
-        [active, ...keys.filter((k) => k !== active)].forEach((k) => index(sp, k).catch(() => {}));
-        Object.keys(urls[keys[0]]).map(Number).forEach((x) => { if (x !== sp && urls[active]) index(x, active).catch(() => {}); });
+        wantKeys().forEach((k) => index(sp, k).catch(() => {}));
+        Object.keys(urls[keys[0]]).map(Number).forEach((x) => { if (x !== sp) Object.keys(wantMix()).forEach((k) => index(x, k).catch(() => {})); });
       };
       // Keep every part's current and next window decoded (active part first), drop the rest.
       const maintain = () => {
         const m = pos();
         const keep = new Set();
         let p = 0;
-        [0, 1].forEach((d) => [active, ...keys.filter((k) => k !== active)].forEach((k) => {
+        [0, 1].forEach((d) => wantKeys().forEach((k) => {
           const x = idxv[`${sp}/${k}`];
           if (!x) return;
           const i = winOf(x, m / info(sp, k).f);
@@ -552,7 +590,7 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
         vo.nextWhen = when + (vo.nextFt - ft) / inf.rate;
         return true;
       };
-      const startVoice = async (k) => {
+      const startVoice = async (k, vol = 1) => {
         if (!urls[k]) return null;
         const e = epoch;
         const x = await index(sp, k);
@@ -569,9 +607,9 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
           const g = ctx.createGain();
           g.gain.value = 0;
           g.connect(master);
-          const vo = { k, x, inf, sp, g, segs: [], when, joined: false, done: false, last: false };
+          const vo = { k, x, inf, sp, g, vol, segs: [], when, joined: false, done: false, last: false };
           if (!place(vo, w, wi, ft, when)) { g.disconnect(); return null; }
-          g.gain.setTargetAtTime(1, when, TAU);
+          g.gain.setTargetAtTime(vol, when, TAU);
           log('voice', k, 'at', when.toFixed(3), 'now', (when - LEAD).toFixed(3), 'ft', ft.toFixed(3), 'music', posAt(when).toFixed(3), 'win', wi);
           return vo;
         }
@@ -580,15 +618,19 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
       // Queue each playing part's next window ahead of time.
       const advance = () => {
         const now = ctx.currentTime;
-        // Safety net: if the selected part isn't playing for any reason, start it.
-        if (playing && urls[active] && !voices[active] && starting[active] === undefined) { log('remount', active); mount(); }
-        // If the selected part has run out of scheduled audio before the end of the piece, restart it.
-        const cur = voices[active];
-        if (playing && cur && !cur.done && cur.until < now - 0.05 && pos() / cur.inf.f < cur.x.dur - 0.2) {
-          log('gap', active, 'last', cur.last, 'nextFt', cur.nextFt?.toFixed(3), 'nextWhen', cur.nextWhen?.toFixed(3), 'until', cur.until.toFixed(3), 'now', now.toFixed(3), 'busy', busy, 'jobs', Object.keys(jobs).join(','));
-          stopVoice(cur);
-          delete voices[active];
-          mount();
+        // Safety nets, for every selected part: start it if it isn't playing for any reason, and
+        // restart it if it has run out of scheduled audio before the end of the piece.
+        if (playing) {
+          Object.keys(wantMix()).forEach((k) => {
+            if (!voices[k] && starting[k] === undefined) { log('remount', k); mount(); return; }
+            const cur = voices[k];
+            if (cur && !cur.done && cur.until < now - 0.05 && pos() / cur.inf.f < cur.x.dur - 0.2) {
+              log('gap', k, 'last', cur.last, 'nextFt', cur.nextFt?.toFixed(3), 'nextWhen', cur.nextWhen?.toFixed(3), 'until', cur.until.toFixed(3), 'now', now.toFixed(3), 'busy', busy, 'jobs', Object.keys(jobs).join(','));
+              stopVoice(cur);
+              delete voices[k];
+              mount();
+            }
+          });
         }
         Object.values(voices).forEach((vo) => {
           while (!vo.done && !vo.last && vo.nextWhen - now < 3) {
@@ -606,24 +648,44 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
           }
         });
       };
-      // Bring up the active part; the others only fade out once it is actually ready.
+      const setVol = (vo, g) => {
+        vo.vol = g;
+        vo.g.gain.cancelScheduledValues(ctx.currentTime);
+        vo.g.gain.setTargetAtTime(g, ctx.currentTime, 0.03);
+      };
+      // Bring up every selected part at its volume; parts no longer selected only fade out once
+      // the new ones are actually playing.
       const mount = async () => {
-        const k = active;
         const e = epoch;
         if (!playing) return;
-        if (voices[k]) {
-          Object.keys(voices).forEach((x) => { if (x !== k) { stopVoice(voices[x]); delete voices[x]; } });
-          return;
-        }
-        if (starting[k] === e) return;
-        starting[k] = e;
-        let vo = null;
-        try { vo = await startVoice(k); } catch (err) { console.error(err); }
-        if (starting[k] === e) delete starting[k];
-        if (!vo) return;
-        if (e !== epoch || voices[k] || active !== k) { stopVoice(vo); return; }
-        Object.keys(voices).forEach((x) => { if (x !== k) { stopVoice(voices[x], vo.when); delete voices[x]; } });
-        voices[k] = vo;
+        const want = wantMix();
+        const missing = Object.keys(want).filter((k) => !voices[k] && starting[k] === undefined);
+        const settle = (at) => Object.keys(voices).forEach((x) => {
+          if (!(x in want)) { stopVoice(voices[x], at); delete voices[x]; }
+          else if (voices[x].vol !== want[x]) setVol(voices[x], want[x]);
+        });
+        if (!missing.length) { if (!Object.keys(want).some((k) => !voices[k])) settle(); return; }
+        missing.forEach((k) => { starting[k] = e; });
+        const got = await Promise.all(missing.map(async (k) => {
+          let vo = null;
+          try { vo = await startVoice(k, want[k]); } catch (err) { console.error(err); }
+          if (starting[k] === e) delete starting[k];
+          return vo;
+        }));
+        const now = wantMix();
+        let at = ctx.currentTime;
+        let landed = false;
+        got.forEach((vo) => {
+          if (!vo) return;
+          if (e !== epoch || voices[vo.k] || !(vo.k in now)) { stopVoice(vo); return; }
+          voices[vo.k] = vo;
+          landed = true;
+          at = Math.max(at, vo.when);
+        });
+        if (landed) Object.keys(voices).forEach((x) => {
+          if (!(x in now)) { stopVoice(voices[x], at); delete voices[x]; }
+          else if (voices[x].vol !== now[x]) setVol(voices[x], now[x]);
+        });
       };
       const begin = async (tol = 0.05) => {
         if (ctx.state !== 'running') await Promise.race([ctx.resume().catch(() => {}), new Promise((r) => setTimeout(r, 400))]);
@@ -714,16 +776,19 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
         const my = ++gen;
         log('speed', s);
         tgt = s;
-        const k = urls[active] ? active : keys[0];
+        const list = Object.keys(wantMix());
+        if (!list.length) list.push(keys[0]);
         // Have the new speed's audio decoded for where playback will be when it switches over,
         // including across a window boundary, so the switch never waits in silence.
         try {
-          const x = await index(s, k);
-          const at = (d) => winOf(x, posAt(ctx.currentTime + d) / info(s, k).f);
-          for (let tries = 0; tries < 4 && my === gen; tries++) {
-            await Promise.all([...new Set([at(LEAD), at(0.6)])].map((i) => win(s, k, i, -1)));
-            if (ready[`${s}/${k}/${at(LEAD)}`]) break;
-          }
+          await Promise.all(list.map(async (k) => {
+            const x = await index(s, k);
+            const at = (d) => winOf(x, posAt(ctx.currentTime + d) / info(s, k).f);
+            for (let tries = 0; tries < 4 && my === gen; tries++) {
+              await Promise.all([...new Set([at(LEAD), at(0.6)])].map((i) => win(s, k, i, -1)));
+              if (ready[`${s}/${k}/${at(LEAD)}`]) break;
+            }
+          }));
         } catch (err) { if (err.message !== 'stale') console.error(err); }
         if (my !== gen) return;
         const when = ctx.currentTime + LEAD;
@@ -734,10 +799,11 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
         stopAll(when);
         mount();
         setTimeout(() => { v.playbackRate = s; }, LEAD * 1000);
-        Object.keys(idx).forEach((id) => { if (!id.startsWith(`${s}/`) && !id.endsWith(`/${active}`)) { delete idx[id]; delete idxv[id]; } });
+        Object.keys(idx).forEach((id) => { if (!id.startsWith(`${s}/`) && !list.includes(id.split('/')[1])) { delete idx[id]; delete idxv[id]; } });
         Object.keys(wins).forEach((id) => { if (!id.startsWith(`${s}/`) && !jobs[id]) { delete wins[id]; delete ready[id]; } });
         warmBytes();
       };
+      applyMix = () => mount();
       setActive = (k) => { log('tab', k, 'v', v.currentTime.toFixed(2), 'heard', heard().toFixed(2)); active = k; mount(); warmBytes(); maintain(); };
       warmBytes();
       setInterval(() => { advance(); maintain(); }, 250);
@@ -786,7 +852,10 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
         if (got >= total || performance.now() - T0 > 30000) { clearInterval(gate); unlockPlay(); }
       }, 100);
     }
-    if (!ctx) setActive = (k) => { active = k; };
+    if (!ctx) {
+      setActive = (k) => { active = k; };
+      document.querySelectorAll('[data-tab=custom], .mixer').forEach((e) => { e.hidden = true; });
+    }
   }
   // Keyboard: space plays/pauses. Left alone while typing in or using a form control, a link,
   // or the PDF viewer.
@@ -808,9 +877,55 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
   document.addEventListener('keyup', (e) => {
     if (spaceHandled && (e.key === ' ' || e.code === 'Space')) { e.preventDefault(); spaceHandled = false; }
   });
+  const mixer = document.querySelector('.mixer');
+  // The mixer floats over the video's bottom-right corner (no layout shift) and can fold down to
+  // a small button; whether it is open is remembered across pieces.
+  const placeMixer = () => {
+    if (!mixer) return;
+    const pl = mixer.closest('.player');
+    const vid = pl.querySelector('.video');
+    mixer.style.right = `${pl.clientWidth - (vid.offsetLeft + vid.offsetWidth) + 8}px`;
+    mixer.style.bottom = `${pl.clientHeight - (vid.offsetTop + vid.offsetHeight) + 8}px`;
+  };
+  if (mixer) {
+    mixer.dataset.open = localStorage.getItem('cpmixopen') === '0' ? '0' : '1';
+    const setOpen = (o) => { mixer.dataset.open = o ? '1' : '0'; try { localStorage.setItem('cpmixopen', o ? '1' : '0'); } catch {} };
+    mixer.querySelector('.mxopen').addEventListener('click', () => setOpen(true));
+    mixer.querySelector('.mxclose').addEventListener('click', () => setOpen(false));
+    const pl = mixer.closest('.player');
+    new ResizeObserver(placeMixer).observe(pl);
+    new ResizeObserver(placeMixer).observe(pl.querySelector('.video'));
+    placeMixer();
+  }
+  mixer?.querySelectorAll('.mrow').forEach((row) => {
+    const k = row.dataset.k;
+    const cb = row.querySelector('input[type=checkbox]');
+    const sl = row.querySelector('.mv');
+    const paint = () => sl.style.setProperty('--p', `${sl.value}%`);
+    const show = () => {
+      cb.checked = mixState.on[k] !== false;
+      sl.value = Math.round((mixState.vols[k] ?? DEFVOL) * 100);
+      sl.disabled = !cb.checked;
+      paint();
+    };
+    row.show = show;
+    show();
+    cb.addEventListener('change', () => { mixState.on[k] = cb.checked; sl.disabled = !cb.checked; saveMix(); applyMix(); });
+    sl.addEventListener('input', () => { mixState.vols[k] = sl.value / 100; paint(); saveMix(); applyMix(); });
+  });
+  mixer?.querySelector('.mxreset').addEventListener('click', () => {
+    mixState.vols = {};
+    mixState.on = {};
+    saveMix();
+    mixer.querySelectorAll('.mrow').forEach((r) => r.show());
+    applyMix();
+  });
   tabs.forEach((tab) => tab.addEventListener('click', () => {
+    mixState.sel = tab.dataset.tab;
+    saveMix();
     if (synced) {
       tabs.forEach((x) => x.setAttribute('aria-selected', String(x === tab)));
+      if (mixer) { mixer.hidden = tab.dataset.tab !== 'custom'; placeMixer(); }
       setActive(tab.dataset.tab);
       dlVideo.hidden = !tab.dataset.video;
       if (tab.dataset.video) dlVideo.href = tab.dataset.video;
@@ -831,4 +946,7 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
     }
     ['audio', 'video'].forEach((k) => handOff(media(prev, k), media(next, k)));
   }));
+  // Reopen with the part (or Custom mix) chosen on the previous piece, if this piece has it.
+  const saved = [...tabs].find((t) => t.dataset.tab === mixState.sel && !t.hidden);
+  if (saved && saved.getAttribute('aria-selected') !== 'true') saved.click();
 </script>

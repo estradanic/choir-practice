@@ -25,6 +25,29 @@ const { title, wide } = Astro.props;
       a { color: #0000ee; }
       small { color: #333; }
       button, .btn { font: inherit; color: #000; background: var(--face); border: 0; padding: 5px 14px; box-shadow: var(--raised); cursor: pointer; text-decoration: none; display: inline-block; }
+      .player { position: relative; }
+      .mixer { position: absolute; z-index: 3; right: 8px; bottom: 8px; }
+      .mixer[hidden], .mixer[data-open="1"] .mxopen, .mixer[data-open="0"] .mxpanel { display: none; }
+      .mxpanel { position: relative; padding: 2px; background: var(--face); box-shadow: var(--raised); }
+      .mxbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 1px 2px 1px 6px; color: #fff; font-size: 12px; font-weight: bold; background: linear-gradient(90deg, var(--navy), #a6caf0); }
+      .mxopen, .mxclose { position: relative; padding: 0; flex: none; }
+      .mxclose { width: 18px; height: 16px; }
+      .mxopen { width: 26px; height: 22px; }
+      .mxopen::before, .mxopen::after, .mxclose::before { content: ""; position: absolute; box-sizing: border-box; }
+      .mxclose::before { left: 4px; bottom: 4px; width: 8px; height: 3px; background: #000; }
+      .mxopen::before { left: 11px; top: 5px; width: 9px; height: 8px; border: 1px solid #000; border-top-width: 2px; }
+      .mxopen::after { left: 6px; top: 9px; width: 9px; height: 8px; border: 1px solid #000; border-top-width: 2px; background: var(--face); }
+      .mxopen:active, .mxclose:active { padding: 0; }
+      .mxrows { display: flex; gap: 4px; padding: 8px 8px 6px; }
+      .mxfoot { padding: 0 8px 8px; text-align: center; }
+      .mxreset { padding: 1px 12px; font-size: 11px; }
+      .mrow { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 46px; }
+      .vs { position: relative; width: 22px; height: 100px; }
+      .vs .mv { position: absolute; left: 50%; top: 50%; width: 100px; height: 22px; flex: none; transform: translate(-50%, -50%) rotate(-90deg); }
+      .mrow label { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 11px; white-space: nowrap; cursor: pointer; }
+      .mrow input[type=checkbox] { -webkit-appearance: none; appearance: none; position: relative; width: 13px; height: 13px; margin: 0; background: #fff; box-shadow: var(--sunken); cursor: pointer; }
+      .mrow input[type=checkbox]:checked::after { content: ""; position: absolute; left: 4px; top: 1px; width: 3px; height: 7px; border: solid #000; border-width: 0 2px 2px 0; transform: rotate(40deg); }
+      .mv:disabled { opacity: .5; cursor: default; }
       button, .btn { touch-action: manipulation; }
       /* The pressed look shifts the label by 1px without changing the button's size, so pressing
          never moves the layout (a shift under the finger can cancel the tap). */
@@ -59,13 +82,13 @@ const { title, wide } = Astro.props;
       .speed button:disabled:active { padding: 3px 0; }
       .sv { min-width: 3em; text-align: center; }
       .time { flex: none; font-variant-numeric: tabular-nums; padding: 3px 6px; background: #fff; box-shadow: var(--sunken); font-size: 0.9rem; }
-      .seek { flex: 1 1 70px; min-width: 0; height: 22px; margin: 0; background: transparent; -webkit-appearance: none; appearance: none; cursor: pointer; }
-      .seek::-webkit-slider-runnable-track { height: 4px; background: linear-gradient(90deg, var(--navy) var(--p, 0%), #fff var(--p, 0%)); box-shadow: var(--sunken); }
-      .seek::-moz-range-track { height: 4px; background: #fff; box-shadow: var(--sunken); }
-      .seek::-webkit-slider-thumb { -webkit-appearance: none; width: 11px; height: 20px; margin-top: -8px; background: var(--face); border: 0; border-radius: 0; box-shadow: var(--raised); }
-      .seek::-moz-range-progress { height: 4px; background: var(--navy); }
-      .seek::-moz-range-thumb { width: 11px; height: 20px; background: var(--face); border: 0; border-radius: 0; box-shadow: var(--raised); }
-      .seek:focus-visible { outline: 1px dotted #000; }
+      .seek, .mv { flex: 1 1 70px; min-width: 0; height: 22px; margin: 0; background: transparent; -webkit-appearance: none; appearance: none; cursor: pointer; }
+      .seek::-webkit-slider-runnable-track, .mv::-webkit-slider-runnable-track { height: 4px; background: linear-gradient(90deg, var(--navy) var(--p, 0%), #fff var(--p, 0%)); box-shadow: var(--sunken); }
+      .seek::-moz-range-track, .mv::-moz-range-track { height: 4px; background: #fff; box-shadow: var(--sunken); }
+      .seek::-webkit-slider-thumb, .mv::-webkit-slider-thumb { -webkit-appearance: none; width: 11px; height: 20px; margin-top: -8px; background: var(--face); border: 0; border-radius: 0; box-shadow: var(--raised); }
+      .seek::-moz-range-progress, .mv::-moz-range-progress { height: 4px; background: var(--navy); }
+      .seek::-moz-range-thumb, .mv::-moz-range-thumb { width: 11px; height: 20px; background: var(--face); border: 0; border-radius: 0; box-shadow: var(--raised); }
+      .seek:focus-visible, .mv:focus-visible { outline: 1px dotted #000; }
       @media (max-width: 420px) { .time { font-size: 0.8rem; padding: 3px 4px; } }
       .video { display: block; width: 100%; max-width: 480px; margin: 0 auto; aspect-ratio: 832/1078; background: #000; box-shadow: var(--sunken); }
       .box { margin: 12px 0; padding: 2px 8px 8px; box-shadow: var(--raised); background: var(--face); }
