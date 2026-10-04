@@ -1,5 +1,5 @@
 ---
-const { title, wide } = Astro.props;
+const { title, wide, bar } = Astro.props;
 ---
 <html lang="en">
   <head>
@@ -14,12 +14,31 @@ const { title, wide } = Astro.props;
       body { font: 13px/1.45 Tahoma, Verdana, "Segoe UI", Arial, sans-serif; max-width: 44rem; margin: 12px auto; padding: 2px 8px 8px; background: var(--face); color: #000; box-shadow: var(--raised), 2px 2px 0 #000; }
       @media (min-width: 600px) { body { font-size: 14px; } }
       h1 { margin: 2px -6px 8px; padding: 4px 8px; font-size: 1.1rem; color: #fff; background: linear-gradient(90deg, var(--navy), #a6caf0); }
+      /* Piece pages: a Windows-style taskbar along the top edge, and the boxes sit straight on the desktop. */
+      :root { --tb: 34px; }
+      body.bar { --tb: 34px; margin-top: var(--tb); padding: 0; display: flow-root; background: none; box-shadow: none; }
+      .taskbar { position: fixed; z-index: 20; top: 0; left: 0; right: 0; min-height: var(--tb); box-sizing: border-box; display: flex; align-items: center; gap: 8px; padding: 3px 6px; background: var(--face); box-shadow: inset 0 1px 0 var(--hi), 0 1px 0 var(--dark), 0 2px 0 var(--mid); }
+      .taskbar .btn { padding: 2px 10px; font-size: 12px; white-space: nowrap; flex: none; }
+      .taskbar .btn:active { padding: 3px 9px 1px 11px; }
+      .taskbar .start { display: inline-flex; align-items: center; gap: 7px; padding: 2px 12px 2px 6px; font-weight: bold; }
+      .taskbar .start::before { content: ""; flex: none; width: 24px; height: 22px; margin: -2px 0; background: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAWCAYAAADafVyIAAAA4UlEQVR42rWVUbKDIAxFD90Y7sx0Z2Fl9308ikVxqjS9Mw7DqLnkJADclJnpzvePu8GXZQEQ0TIzveTuumqSrmJY17Wbl1Ko2aTplUrSfg6ayqQL7u6SOA0+MjGz9lxY/efgIxOJ+u+W1bCLnk/rmKcE0ngEyDnj7m1epVagV1q1aFPKObfCm4FZbaI9illRmb0VXg1RKQVIX449rl1haZ0zO1bM4xaOMhlg2rL4Nri7v++Do0FEBtum47jDIzGdGkRhOiD6BabhIRiJ6dQgGFN/Wfy/sKAbsJ2TB0XdtwngD7ieaNEAKOr7AAAAAElFTkSuQmCC) no-repeat; image-rendering: pixelated; }
+      .taskbar .start:active { padding: 3px 11px 1px 9px; }
+      .tbset { flex: 0 1 auto; min-width: 0; display: flex; align-items: center; gap: 4px; }
+      .tbset .sn { min-width: 0; padding: 3px 10px; background: #fff; font-size: 12px; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-shadow: var(--sunken); }
+      .tbset .sn small { font-weight: normal; margin-left: 4px; }
+      .taskbar h1 { flex: 0 1 auto; min-width: 0; margin: 0 0 0 auto; padding: 3px 10px; font-size: 13px; font-weight: bold; color: #000; background: none; box-shadow: var(--sunken); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .tbsep { display: none; }
+      @media (max-width: 760px) {
+        body.bar2 { --tb: 68px; }
+        body.bar2 .taskbar { flex-wrap: wrap; row-gap: 4px; }
+        body.bar2 .start { order: 1; }
+        body.bar2 .taskbar h1 { order: 2; flex: 0 1 auto; margin-left: auto; }
+        body.bar2 .tbsep { display: block; order: 3; flex: 1 0 100%; height: 0; border-top: 1px solid var(--mid); border-bottom: 1px solid var(--hi); }
+        body.bar2 .tbset { order: 4; flex: 1 0 100%; }
+        body.bar2 .tbset .sn { flex: 1; }
+      }
       .titlebar { display: flex; align-items: center; gap: 8px; margin: 2px -6px 8px; padding: 2px 4px 2px 8px; background: linear-gradient(90deg, var(--navy), #a6caf0); }
       .titlebar h1 { flex: 1; margin: 0; padding: 0; background: none; min-width: 0; }
-      .setbar { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; }
-      .setbar .sn { flex: 1; min-width: 0; font-weight: bold; }
-      .setbar .sc { white-space: nowrap; }
-      .setbar .btn { padding: 1px 8px; font-size: 12px; white-space: nowrap; }
       .titlebar .btn { padding: 1px 8px; font-size: 12px; white-space: nowrap; }
       h2 { font-size: 1rem; margin: 12px 0 4px; }
       a { color: #0000ee; }
@@ -131,10 +150,12 @@ const { title, wide } = Astro.props;
       .pdfview .fallback { display: none; }
       .pdfview.failed .fallback { display: block; }
       ul.list { list-style: none; padding: 0; margin: 0; background: #fff; box-shadow: var(--sunken); }
-      ul.list li { padding: 6px 8px; border-bottom: 1px dotted var(--mid); }
+      ul.list li { padding: 6px 8px; }
+      /* Dotted line between visible items only (so none after the last, even when filtering). */
+      ul.list li:not([hidden]) ~ li:not([hidden]) { border-top: 1px dotted var(--mid); }
       ul.list a { font-size: 1.05rem; }
       [hidden] { display: none !important; }
     </style>
   </head>
-  <body class={wide ? 'wide' : undefined}><slot /></body>
+  <body class={[wide && 'wide', bar && 'bar', bar === 'set' && 'bar2'].filter(Boolean).join(' ') || undefined}><slot /></body>
 </html>

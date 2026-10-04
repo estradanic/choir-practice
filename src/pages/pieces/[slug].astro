@@ -21,20 +21,20 @@ const pa = piece.tracks.some((t) => t.pdf) ? 8.5 / 11 : null;
 const file = (f) => `${base}/pieces/${piece.slug}/${f}`;
 const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries(t.slow).map(([k, v]) => [k, file(v)]))) : undefined);
 ---
-<Layout title={piece.title} wide>
+<Layout title={piece.title} wide bar={piece.set ? 'set' : true}>
   {pa && <script is:inline define:vars={{ pa }}>document.documentElement.style.setProperty('--pa', pa); window.__paSet = true;</script>}
-  <div class="titlebar">
-    <h1>{piece.title}{piece.composer && ` - ${piece.composer}`}</h1>
-    <a class="btn" href={`${base}/`}>◄ All pieces</a>
+  <div class="taskbar">
+    <a class="btn start" href={`${base}/`} title="Back to all pieces">All pieces</a>
+    {piece.set && <div class="tbsep"></div>}
+    {piece.set && (
+      <div class="tbset">
+        {prev ? <a class="btn" href={`${base}/pieces/${prev.slug}/`} title={`Previous: ${prev.title}`}>◄ Prev</a> : <button type="button" class="btn" disabled>◄ Prev</button>}
+        <span class="sn" title={piece.set}>{piece.set} <small>{si + 1} of {sibs.length}</small></span>
+        {next ? <a class="btn" href={`${base}/pieces/${next.slug}/`} title={`Next: ${next.title}`}>Next ►</a> : <button type="button" class="btn" disabled>Next ►</button>}
+      </div>
+    )}
+    <h1 title={`${piece.title}${piece.composer ? ` - ${piece.composer}` : ''}`}>{piece.title}{piece.composer && ` - ${piece.composer}`}</h1>
   </div>
-  {piece.set && (
-    <div class="setbar">
-      <span class="sn" title={piece.set}>{piece.set}</span>
-      <span class="sc">{si + 1} of {sibs.length}</span>
-      {prev ? <a class="btn" href={`${base}/pieces/${prev.slug}/`} title={`Previous: ${prev.title}`}>◄ Prev</a> : <button type="button" class="btn" disabled>◄ Prev</button>}
-      {next ? <a class="btn" href={`${base}/pieces/${next.slug}/`} title={`Next: ${next.title}`}>Next ►</a> : <button type="button" class="btn" disabled>Next ►</button>}
-    </div>
-  )}
   {!synced && <nav class="tabs" role="tablist" >
     {piece.tracks.map((t, i) => (
       <button role="tab" data-tab={t.key} data-audio={t.audio ? file(t.audio) : undefined} data-slow={slowOf(t)} data-video={t.video || undefined} data-name={`${piece.slug}-${t.key}.mp3`} aria-selected={i === 0 ? 'true' : 'false'}>{t.label}</button>
