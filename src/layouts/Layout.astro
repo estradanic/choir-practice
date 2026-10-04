@@ -25,6 +25,10 @@ const { title, wide } = Astro.props;
       a { color: #0000ee; }
       small { color: #333; }
       button, .btn { font: inherit; color: #000; background: var(--face); border: 0; padding: 5px 14px; box-shadow: var(--raised); cursor: pointer; text-decoration: none; display: inline-block; }
+      button, .btn { touch-action: manipulation; }
+      /* The pressed look shifts the label by 1px without changing the button's size, so pressing
+         never moves the layout (a shift under the finger can cancel the tap). */
+      .titlebar .btn:active, .setbar .btn:active { padding: 2px 7px 0 9px; }
       button:active, .btn:active { box-shadow: var(--sunken); padding: 6px 13px 4px 15px; }
       button:focus-visible, .btn:focus-visible { outline: 1px dotted #000; outline-offset: -4px; }
       nav.tabs { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0; }
