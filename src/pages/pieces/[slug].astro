@@ -878,13 +878,13 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
     if (spaceHandled && (e.key === ' ' || e.code === 'Space')) { e.preventDefault(); spaceHandled = false; }
   });
   const mixer = document.querySelector('.mixer');
-  // The mixer floats over the video's bottom-right corner (no layout shift) and can fold down to
+  // The mixer floats over the video's bottom-left corner (no layout shift) and can fold down to
   // a small button; whether it is open is remembered across pieces.
   const placeMixer = () => {
     if (!mixer) return;
     const pl = mixer.closest('.player');
     const vid = pl.querySelector('.video');
-    mixer.style.right = `${pl.clientWidth - (vid.offsetLeft + vid.offsetWidth) + 8}px`;
+    mixer.style.left = `${vid.offsetLeft + 8}px`;
     mixer.style.bottom = `${pl.clientHeight - (vid.offsetTop + vid.offsetHeight) + 8}px`;
   };
   if (mixer) {
