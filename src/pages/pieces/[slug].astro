@@ -107,6 +107,9 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
           <h2><span>Score PDF</span><button type="button" class="min" aria-label="Minimize Score PDF" aria-expanded="true"></button></h2>
           <div class="body">
           <div class="pdfview" data-src={file(t.pdf)}>
+            <div class="pages" tabindex="0" aria-label={`${t.label} score`}></div>
+            <div class="loading" role="progressbar" aria-label="Loading score"><span class="lt">Loading score… 0%</span><div class="track"><i></i></div></div>
+            <p class="fallback">Can't see the score? Use the buttons below to open or download it.</p>
             <div class="bar">
               <button type="button" data-act="prev" aria-label="Previous page">◄</button>
               <button type="button" data-act="next" aria-label="Next page">►</button>
@@ -116,9 +119,6 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
               <button type="button" data-act="fit">Fit</button>
               <button type="button" class="fs" data-act="fs" aria-label="Fullscreen"></button>
             </div>
-            <div class="pages" tabindex="0" aria-label={`${t.label} score`}></div>
-            <div class="loading" role="progressbar" aria-label="Loading score"><span class="lt">Loading score… 0%</span><div class="track"><i></i></div></div>
-            <p class="fallback">Can't see the score? Use the buttons below to open or download it.</p>
           </div>
           <p class="actions">
             <a class="btn" href={file(t.pdf)} target="_blank" rel="noopener">Open in new tab</a>
