@@ -8,6 +8,13 @@ export function getStaticPaths() {
 const { piece } = Astro.props;
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 const synced = !!piece.tracks[0].video;
+// Neighbours within the piece's set, in the same order the home page lists them.
+const sibs = piece.set
+  ? getPieces().filter((p) => p.set === piece.set).sort((a, b) => a.setOrder - b.setOrder || a.title.localeCompare(b.title))
+  : [];
+const si = sibs.findIndex((p) => p.slug === piece.slug);
+const prev = sibs[si - 1];
+const next = sibs[si + 1];
 // Scores are always US Letter, so the layout doesn't need to wait for the PDF to load.
 const pa = piece.tracks.some((t) => t.pdf) ? 8.5 / 11 : null;
 const file = (f) => `${base}/pieces/${piece.slug}/${f}`;
@@ -19,6 +26,14 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
     <h1>{piece.title}{piece.composer && ` - ${piece.composer}`}</h1>
     <a class="btn" href={`${base}/`}>◄ All pieces</a>
   </div>
+  {piece.set && (
+    <div class="setbar">
+      <span class="sn" title={piece.set}>{piece.set}</span>
+      <span class="sc">{si + 1} of {sibs.length}</span>
+      {prev ? <a class="btn" href={`${base}/pieces/${prev.slug}/`} title={`Previous: ${prev.title}`}>◄ Prev</a> : <button type="button" class="btn" disabled>◄ Prev</button>}
+      {next ? <a class="btn" href={`${base}/pieces/${next.slug}/`} title={`Next: ${next.title}`}>Next ►</a> : <button type="button" class="btn" disabled>Next ►</button>}
+    </div>
+  )}
   {!synced && <nav class="tabs" role="tablist" >
     {piece.tracks.map((t, i) => (
       <button role="tab" data-tab={t.key} data-audio={t.audio ? file(t.audio) : undefined} data-slow={slowOf(t)} data-video={t.video || undefined} data-name={`${piece.slug}-${t.key}.mp3`} aria-selected={i === 0 ? 'true' : 'false'}>{t.label}</button>
