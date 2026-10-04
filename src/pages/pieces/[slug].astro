@@ -55,7 +55,7 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
         </section>
       )}
       {synced && i === 0 && (
-        <section class="box">
+        <section class="box vid">
           <h2><span>Video</span><button type="button" class="min" aria-label="Minimize Video" aria-expanded="true"></button></h2>
           <div class="body">
           <Player kind="video" src={t.video}>
@@ -91,7 +91,7 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
         </section>
       )}
       {!synced && t.video && (
-        <section class="box">
+        <section class="box vid">
           <h2><span>Video</span><button type="button" class="min" aria-label="Minimize Video" aria-expanded="true"></button></h2>
           <div class="body">
           <Player kind="video" src={t.video} />
