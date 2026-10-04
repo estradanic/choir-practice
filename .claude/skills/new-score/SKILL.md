@@ -33,6 +33,16 @@ Input: path to an `.mscz` file (ask if not given). Keep it token-cheap: run the 
 6. **Verify**: `npm run build`; confirm it passes.
 7. **Offer to commit and push** (`git add public/pieces/<slug>`; message "Add <title>"). Include any supporting changes made along the way (e.g. `.gitignore`, `scripts/new-piece.mjs`, `src/lib/pieces.js`, this skill). The GitHub Action deploys it.
 
+## Regenerating an existing piece
+
+When the piece is already on the site and only its media is stale (the `.mscz` was edited), skip steps 1, 2 and 4. Don't re-run `npm run new-piece`, and don't touch `title`, `composer`, `set`, `setOrder` or `tags`: the existing `piece.json` is the record of what the piece is, and `export.py` only ever rewrites `parts` in it.
+
+1. Export into the existing folder — it overwrites the PDF and MP3s in place: `python3 .claude/skills/new-score/export.py "<file.mscz>" public/pieces/<slug>`.
+2. `python3 .claude/skills/new-score/slow_audio.py public/pieces/<slug> --force`. The `--force` matters: without it the slowed copies of the *old* MP3s are left in place and the speed buttons play a different performance than the main one.
+3. Compare the parts `export.py` printed against the files already in the folder. Deleted parts need their stale `.mp3` and `speeds/*/<part>.mp3` removed, or they keep shipping dead weight; then prune `parts`/`videos` in `piece.json` and re-run the export so `parts` matches again.
+4. Re-render and re-upload the videos (step 5) and bump `videoVersion` in `site.json`.
+5. `npm run build`, then commit as "Update media for <title>", not "Add <title>".
+
 ## Notes
 - File naming rules: `score.pdf`, `full.mp3`, `<part>.mp3`. Parts are auto-detected from filenames; any names (e.g. `baritone`) work.
 - Voice order on the page is the score's staff order, read from `parts` in `piece.json` (written by `export.py`). `src/lib/pieces.js` only falls back to `soprano, alto, tenor, baritone, bass` for pieces exported before that existed, so don't add non-standard voices to that list.
