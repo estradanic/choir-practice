@@ -6,6 +6,15 @@ permissions:
   contents: read
   pages: write
   id-token: write
+
+# GitHub Pages allows one deployment at a time: a second deploy job fails with
+# "Deployment request failed ... due to in progress deployment" (400) and the
+# whole site update is silently lost. One concurrency group, and a newer push
+# cancels the older run instead of colliding with it.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -27,5 +36,30 @@ jobs:
     runs-on: ubuntu-latest
     environment: { name: github-pages, url: "${{ steps.d.outputs.page_url }}" }
     steps:
-      - id: d
+      # A cancelled or superseded run can still leave a deployment in flight for
+      # a little while, so even a lone push can lose that race. Retry: the
+      # transient 400 clears once the other deployment finishes. Steps use
+      # `outcome` (not `conclusion`) so a retried failure still counts as a
+      # failure, and only the last attempt is allowed to fail the job.
+      - name: Deploy (attempt 1)
+        id: d1
+        continue-on-error: true
         uses: actions/deploy-pages@v4
+      - if: steps.d1.outcome == 'failure'
+        run: sleep 30
+      - name: Deploy (attempt 2)
+        id: d2
+        if: steps.d1.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/deploy-pages@v4
+      - if: steps.d2.outcome == 'failure'
+        run: sleep 60
+      - name: Deploy (attempt 3)
+        id: d3
+        if: steps.d2.outcome == 'failure'
+        uses: actions/deploy-pages@v4
+      - name: Deployment URL
+        id: d
+        # The winning attempt's page_url, whichever it was, for the environment link.
+        if: always()
+        run: echo "page_url=${{ steps.d1.outputs.page_url || steps.d2.outputs.page_url || steps.d3.outputs.page_url }}" >> "$GITHUB_OUTPUT"
