@@ -10,10 +10,12 @@ Input: path to an `.mscz` file (ask if not given). Keep it token-cheap: run the 
 
 ## Steps
 
-1. **Ask (one question call)**: title, composer, set name (optional, plus position in the set), tags, and **anything non-standard about the parts** — anything that is not standard SATB.
-   - **Always ask about tags, every time — never skip it.** Do not infer them from the title, composer or set, and do not copy them from a sibling piece in the same set (a Gloria is a Mass, but confirm rather than assume). Offer the existing tags to pick from:
+1. **Gather info**: take everything the user already stated in their request (title, composer, set, tags, part layout) as final. **Only ask about what they did not say**, in one question call, and skip the call entirely if nothing is missing. Fields: title, composer, set name (optional, plus position in the set), tags, and **anything non-standard about the parts** — anything that is not standard SATB.
+   - **Tags: if the user named tags, use them exactly as given, new or existing. Never ask to confirm them, even a tag that doesn't exist yet; a new tag is just created by using it.** "No tags" / "no set" / "normal SATB" are also complete answers. Only if the user said nothing about tags, ask, and do not infer them from the title, composer or set or copy them from a sibling piece. Offer the existing tags to pick from:
+
      `python3 -c "import json,glob;print(sorted({t for f in glob.glob('public/pieces/*/piece.json') for t in json.load(open(f)).get('tags',[])}))"`
-     (A plain `grep -h '"tags"'` only matches the opening `"tags": [` line and never shows the values — that's why the tags list must be read properly.) Reuse an existing tag when it fits; confirm any new tag name instead of inventing one.
+
+     (A plain `grep -h '"tags"'` only matches the opening line, never the values.) When the user didn't name a tag, reuse an existing one that fits.
    - Offer options like Descant, extra Soprano/Alto splits, Baritone, Bass II, doubling, a piano/organ part, or "standard SATB, nothing unusual".
    - Compare with the score: `export.py` prints the parts it found. A part the user mentions but the export doesn't produce means the score is set up unusually — see Notes.
    - Never rely on this alone: check the produced `<part>.mp3` names against what the user said and ask if they disagree.
