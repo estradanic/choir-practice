@@ -2,6 +2,21 @@
   "title": "Adoramus Te",
   "composer": "Quirino Gasparini",
   "set": "",
-  "tags": [],
-  "videos": []
+  "tags": [
+    "Lent"
+  ],
+  "videos": [
+    "full",
+    "soprano",
+    "alto",
+    "tenor",
+    "bass"
+  ],
+  "parts": [
+    "soprano",
+    "alto",
+    "tenor",
+    "bass"
+  ],
+  "setOrder": null
 }
