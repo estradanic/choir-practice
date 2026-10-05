@@ -330,6 +330,7 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
   const dlVideo = document.getElementById('dl-video');
   const dlAudio = document.getElementById('dl-audio');
   let tabBlock = () => '';
+  let restoring = false;
   let say = () => {};
   if (synced) {
     const v = document.querySelector('.player video');
@@ -955,7 +956,7 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
   });
   tabs.forEach((tab) => tab.addEventListener('click', () => {
     const why = tabBlock(tab.dataset.tab);
-    if (why) { if (tab.getAttribute('aria-selected') !== 'true') say(why); return; }
+    if (why && !restoring) { if (tab.getAttribute('aria-selected') !== 'true') say(why); return; }
     mixState.sel = tab.dataset.tab;
     saveMix();
     if (synced) {
@@ -986,5 +987,7 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
   }));
   // Reopen with the part (or Custom mix) chosen on the previous piece, if this piece has it.
   const saved = [...tabs].find((t) => t.dataset.tab === mixState.sel && !t.hidden);
+  restoring = true;
   if (saved && saved.getAttribute('aria-selected') !== 'true') saved.click();
+  restoring = false;
 </script>
