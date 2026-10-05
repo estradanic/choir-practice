@@ -21,7 +21,7 @@ const { title, wide, bar } = Astro.props;
       .taskbar .btn { padding: 2px 10px; font-size: 12px; white-space: nowrap; flex: none; }
       .taskbar .btn:active { padding: 3px 9px 1px 11px; }
       .taskbar .start { display: inline-flex; align-items: center; gap: 7px; padding: 2px 12px 2px 6px; font-weight: bold; }
-      .taskbar .start::before { content: ""; flex: none; width: 24px; height: 22px; margin: -2px 0; background: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAWCAYAAADafVyIAAAA4UlEQVR42rWVUbKDIAxFD90Y7sx0Z2Fl9308ikVxqjS9Mw7DqLnkJADclJnpzvePu8GXZQEQ0TIzveTuumqSrmJY17Wbl1Ko2aTplUrSfg6ayqQL7u6SOA0+MjGz9lxY/efgIxOJ+u+W1bCLnk/rmKcE0ngEyDnj7m1epVagV1q1aFPKObfCm4FZbaI9illRmb0VXg1RKQVIX449rl1haZ0zO1bM4xaOMhlg2rL4Nri7v++Do0FEBtum47jDIzGdGkRhOiD6BabhIRiJ6dQgGFN/Wfy/sKAbsJ2TB0XdtwngD7ieaNEAKOr7AAAAAElFTkSuQmCC) no-repeat; image-rendering: pixelated; }
+      .taskbar .start::before { content: ""; flex: none; width: 16px; height: 15px; background: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAPCAYAAADtc08vAAABHUlEQVR42pWSzW0CQQyFv0G5ZzvI0MF2sEMlDB2kgzEdUMKcOaUEUwGUYDrYDpzDMhGIAMuTLPvJ/5bhBUop/sy/eJKIqvpyuQR4WCRcExH5C0wpMQwDAIfDgZTSXfwN9vu9m5mbVVdVd3cXmcTdvdbqgJdS/N+1piRukpuGyVZVF8Hd8VKmtUIpBcBXqxVm1kZFdZKUJmm2qmKWmz/QOs6FiLiqejvsxzj+cD5X5sIMhmGg1krO2RfH4ydfX/XizABPeYy13QwghFKKbzbnNyaIiChmihlhsd1uQ63xZefGYzRUlRivHklEPGebPYVqIucMEBaXAsHMZt0AYL3O96+823173+8Yx55x7Om6E113eshrVVQtXP+28z7CL1YCBSCUsbKEAAAAAElFTkSuQmCC) no-repeat; image-rendering: pixelated; }
       .taskbar .start:active { padding: 3px 11px 1px 9px; }
       .tbset { flex: 0 1 auto; min-width: 0; display: flex; align-items: center; gap: 4px; }
       .tbset .sn { min-width: 0; padding: 3px 10px; background: #fff; font-size: 12px; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-shadow: var(--sunken); }
@@ -68,6 +68,10 @@ const { title, wide, bar } = Astro.props;
       .mrow input[type=checkbox]:checked::after { content: ""; position: absolute; left: 4px; top: 1px; width: 3px; height: 7px; border: solid #000; border-width: 0 2px 2px 0; transform: rotate(40deg); }
       .mv:disabled { opacity: .5; cursor: default; }
       button, .btn { touch-action: manipulation; }
+      .btn[aria-disabled] { color: #808080; text-shadow: 1px 1px #fff; cursor: default; pointer-events: auto; }
+      .btn[aria-disabled]:active { box-shadow: var(--raised); padding: 5px 14px; }
+      button:disabled { pointer-events: none; }
+      .mv, .vs, .seek { touch-action: none; }
       /* The pressed look shifts the label by 1px without changing the button's size, so pressing
          never moves the layout (a shift under the finger can cancel the tap). */
       .titlebar .btn:active, .setbar .btn:active { padding: 2px 7px 0 9px; }
@@ -149,7 +153,7 @@ const { title, wide, bar } = Astro.props;
       .pdfview:fullscreen .pwrap { flex: 1; min-height: 0; display: flex; flex-direction: column; }
       .pdfview:fullscreen .pwrap .pages { flex: 1; }
       /* Win95-style scrollbar */
-      :root { --wsb-bg: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAF0lEQVR42mOYMGHC////Gf///8/AwAAAPisHrNwK8ukAAAAASUVORK5CYII=); --wsb-sz: 2px; }
+      :root { --wsb-bg: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAF0lEQVR42mNYuePa////Gf///8/AwAAARFIIMyQljYIAAAAASUVORK5CYII=); --wsb-sz: 2px; }
       /* The dot tile is rebuilt by pdfview.js to match the screen's pixel ratio, so the dots stay evenly spaced at 125%/150% scaling. */
       .wsb { display: flex; background: var(--wsb-bg) 0 0 / var(--wsb-sz) var(--wsb-sz) #fff; image-rendering: pixelated; }
       .wsb-v[hidden] { display: none; }
@@ -185,5 +189,33 @@ const { title, wide, bar } = Astro.props;
       [hidden] { display: none !important; }
     </style>
   </head>
+  <script is:inline>
+    (() => {
+      const tip = document.createElement('div');
+      tip.className = 'tip';
+      tip.style.cssText = 'position: fixed; z-index: 99; pointer-events: none; max-width: 300px; padding: 2px 4px 3px; background: #ffffe1; color: #000; border: 1px solid #000; font: 11px Tahoma, "MS Sans Serif", Arial, sans-serif; line-height: 1.25;';
+      tip.hidden = true;
+      let t = 0, cur = null, x = 0, y = 0;
+      const place = () => {
+        tip.style.left = Math.max(0, Math.min(x + 12, innerWidth - tip.offsetWidth - 2)) + 'px';
+        tip.style.top = (y + 24 + tip.offsetHeight > innerHeight ? y - tip.offsetHeight - 6 : y + 20) + 'px';
+      };
+      const hide = () => { clearTimeout(t); tip.hidden = true; cur = null; };
+      document.addEventListener('mouseover', (e) => {
+        if (e.pointerType === 'touch') return;
+        const el = e.target.closest?.('[title], [data-tip]');
+        if (el === cur) return;
+        hide();
+        if (!el) return;
+        if (el.hasAttribute('title')) { el.dataset.tip = el.title; el.removeAttribute('title'); }
+        if (!el.dataset.tip) return;
+        cur = el; x = e.clientX; y = e.clientY;
+        t = setTimeout(() => { tip.textContent = el.dataset.tip; tip.hidden = false; place(); }, 500);
+      });
+      document.addEventListener('mousemove', (e) => { x = e.clientX; y = e.clientY; if (!tip.hidden) place(); });
+      for (const ev of ['mousedown', 'keydown', 'scroll', 'blur']) addEventListener(ev, hide, true);
+      document.addEventListener('DOMContentLoaded', () => document.body.append(tip));
+    })();
+  </script>
   <body class={[wide && 'wide', bar && 'bar', bar === 'set' && 'bar2'].filter(Boolean).join(' ') || undefined}><slot /></body>
 </html>

@@ -10,7 +10,7 @@ const dots = () => {
   const g = c.getContext('2d');
   g.fillStyle = '#fff';
   g.fillRect(0, 0, d * 2, d * 2);
-  g.fillStyle = '#909090';
+  g.fillStyle = '#a9b8d6';
   g.fillRect(0, 0, d, d);
   const st = document.documentElement.style;
   st.setProperty('--wsb-bg', `url(${c.toDataURL()})`);

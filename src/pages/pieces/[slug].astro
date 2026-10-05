@@ -928,10 +928,13 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
       tabs.forEach((x) => x.setAttribute('aria-selected', String(x === tab)));
       if (mixer) { mixer.hidden = tab.dataset.tab !== 'custom'; placeMixer(); }
       setActive(tab.dataset.tab);
-      dlVideo.hidden = !tab.dataset.video;
-      if (tab.dataset.video) dlVideo.href = tab.dataset.video;
-      dlAudio.hidden = !tab.dataset.audio;
-      if (tab.dataset.audio) { dlAudio.href = tab.dataset.audio; dlAudio.download = tab.dataset.name; }
+      const tip = 'Not available for the custom mix';
+      for (const [el, url] of [[dlVideo, tab.dataset.video], [dlAudio, tab.dataset.audio]]) {
+        el.toggleAttribute('aria-disabled', !url);
+        if (url) { el.removeAttribute("title"); delete el.dataset.tip; } else el.dataset.tip = tip;
+        if (url) el.href = url; else el.removeAttribute('href');
+      }
+      if (tab.dataset.audio) dlAudio.download = tab.dataset.name;
       return;
     }
     const prev = [...panels].find((p) => !p.hidden);
