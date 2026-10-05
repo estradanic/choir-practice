@@ -178,6 +178,12 @@ const { title, wide, bar } = Astro.props;
       .pdfview .loading, .vload { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(260px, 80%); padding: 10px; background: var(--face); box-shadow: var(--raised); text-align: center; }
       .vload { top: 40%; z-index: 2; }
       .pdfview .loading.done, .vload.done { display: none; }
+      .vload.msg .track { display: none; }
+      .vload.msg .lt { margin-bottom: 0; }
+      button.wait { color: var(--mid); text-shadow: 1px 1px var(--hi); cursor: default; }
+      nav.tabs button.wait:active { box-shadow: var(--raised); padding: 5px 14px; }
+      nav.tabs button.wait[aria-selected=true]:active { box-shadow: var(--sunken); }
+      .speed button.wait:active { box-shadow: var(--raised); padding: 3px 0; }
       .pdfview .loading .lt, .vload .lt { display: block; margin-bottom: 8px; }
       .pdfview .loading .track, .vload .track { height: 18px; padding: 2px; background: #fff; box-shadow: var(--sunken); }
       .pdfview .loading i, .vload i { display: block; height: 100%; width: 0; background: repeating-linear-gradient(90deg, #000080 0 10px, transparent 10px 12px); }

@@ -210,7 +210,10 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
     };
     sb.forEach((b) => b.addEventListener('click', () => {
       const i = SPEEDS.indexOf(sp);
-      p.setSpeed(SPEEDS[Math.max(0, Math.min(SPEEDS.length - 1, i + Number(b.dataset.spd)))]);
+      const t = SPEEDS[Math.max(0, Math.min(SPEEDS.length - 1, i + Number(b.dataset.spd)))];
+      const why = p.speedWhy?.(t);
+      if (why) { p.say(why); return; }
+      p.setSpeed(t);
     }));
     shown();
     ['timeupdate', 'loadedmetadata', 'durationchange', 'seeked'].forEach((e) => m.addEventListener(e, paint));
@@ -326,6 +329,8 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
   const saveMix = () => { try { sessionStorage.setItem('cpmix', JSON.stringify(mixState)); } catch {} };
   const dlVideo = document.getElementById('dl-video');
   const dlAudio = document.getElementById('dl-audio');
+  let tabBlock = () => '';
+  let say = () => {};
   if (synced) {
     const v = document.querySelector('.player video');
     const vp = v.closest('.player');
@@ -508,9 +513,12 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
         return wins[id];
       };
       const winOf = (x, ft) => (x.n ? Math.floor(ft / WIN) : 0);
+      // Load in stages so each stage gets the whole connection: the sounding part first, then the
+      // other parts, then the other speeds.
+      let stage = 0;
       const warmBytes = () => {
-        wantKeys().forEach((k) => index(sp, k).catch(() => {}));
-        Object.keys(urls[keys[0]]).map(Number).forEach((x) => { if (x !== sp) Object.keys(wantMix()).forEach((k) => index(x, k).catch(() => {})); });
+        (stage >= 1 ? wantKeys() : Object.keys(wantMix())).forEach((k) => index(sp, k).catch(() => {}));
+        if (stage >= 2) Object.keys(urls[keys[0]]).map(Number).forEach((x) => { if (x !== sp) Object.keys(wantMix()).forEach((k) => index(x, k).catch(() => {})); });
       };
       // Keep every part's current and next window decoded (active part first), drop the rest.
       const maintain = () => {
@@ -828,6 +836,8 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
       let open = false;
       const unlockPlay = () => {
         open = true;
+        stage = 1;
+        warmBytes();
         box.classList.add('done');
         pp.disabled = false;
         const i = [0.75, 0.875, 1].indexOf(vp.speed());
@@ -836,21 +846,43 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
         log('gate open');
       };
       v.play = () => (open ? nativePlay() : Promise.resolve());
-      const gate = setInterval(() => {
-        const m = pos();
-        let got = 0;
-        keys.forEach((k) => {
-          const x = idxv[`${sp}/${k}`];
-          if (!x) return;
-          got += 1;
-          if (ready[`${sp}/${k}/${winOf(x, m / info(sp, k).f)}`]) got += 1;
-        });
-        const total = keys.length * 2;
-        const pct = Math.round((got / total) * 100);
-        lt.textContent = `Loading audio… ${pct}%`;
-        box.setAttribute('aria-valuenow', pct);
-        fill.style.width = `${Math.floor(((fill.parentElement.clientWidth - 4) * pct) / 100 / 12) * 12}px`;
-        if (got >= total || performance.now() - T0 > 30000) { clearInterval(gate); unlockPlay(); }
+      const need = () => { const l = Object.keys(wantMix()); return l.length ? l : [keys[0]]; };
+      const partReady = (k) => { const x = idxv[`${sp}/${k}`]; return !!x && !!ready[`${sp}/${k}/${winOf(x, pos() / info(sp, k).f)}`]; };
+      const tabReady = (t) => (t === 'custom' ? keys.filter((k) => k !== 'full').every(partReady) : !urls[t] || partReady(t));
+      const spdReady = (x) => need().every((k) => idxv[`${x}/${k}`]);
+      const SPS = [0.75, 0.875, 1];
+      const mark = (el, why) => {
+        el.classList.toggle('wait', !!why);
+        if (why) { el.setAttribute('aria-disabled', 'true'); el.dataset.tip = why; } else { el.removeAttribute('aria-disabled'); delete el.dataset.tip; }
+      };
+      let msgT = 0;
+      say = (text) => {
+        lt.textContent = text;
+        box.classList.add('msg');
+        box.classList.remove('done');
+        clearTimeout(msgT);
+        msgT = setTimeout(() => { box.classList.remove('msg'); if (open) box.classList.add('done'); }, 2500);
+      };
+      tabBlock = (t) => (tabReady(t) ? '' : `${document.querySelector(`[data-tab="${t}"]`).textContent.trim()} is still loading…`);
+      vp.speedWhy = (x) => (spdReady(x) ? '' : `${x}× is still loading…`);
+      vp.say = (text) => say(text);
+      setInterval(() => {
+        if (!open) {
+          const n = need();
+          let got = 0;
+          n.forEach((k) => { if (idxv[`${sp}/${k}`]) got += 1; if (partReady(k)) got += 1; });
+          const pct = Math.round((got / (n.length * 2)) * 100);
+          lt.textContent = `Loading audio… ${pct}%`;
+          box.setAttribute('aria-valuenow', pct);
+          fill.style.width = `${Math.floor(((fill.parentElement.clientWidth - 4) * pct) / 100 / 12) * 12}px`;
+          if (got >= n.length * 2 || performance.now() - T0 > 30000) unlockPlay();
+        }
+        tabs.forEach((t) => mark(t, tabBlock(t.dataset.tab)));
+        if (open) {
+          const i = SPS.indexOf(vp.speed());
+          spd.forEach((b, j) => { const t = SPS[i + (j ? 1 : -1)]; mark(b, t === undefined ? '' : vp.speedWhy(t)); });
+        }
+        if (stage === 1 && keys.every((k) => idxv[`${sp}/${k}`])) { stage = 2; warmBytes(); }
       }, 100);
     }
     if (!ctx) {
@@ -922,6 +954,8 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
     applyMix();
   });
   tabs.forEach((tab) => tab.addEventListener('click', () => {
+    const why = tabBlock(tab.dataset.tab);
+    if (why) { say(why); return; }
     mixState.sel = tab.dataset.tab;
     saveMix();
     if (synced) {
