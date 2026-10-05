@@ -955,7 +955,7 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
   });
   tabs.forEach((tab) => tab.addEventListener('click', () => {
     const why = tabBlock(tab.dataset.tab);
-    if (why) { say(why); return; }
+    if (why) { if (tab.getAttribute('aria-selected') !== 'true') say(why); return; }
     mixState.sel = tab.dataset.tab;
     saveMix();
     if (synced) {
