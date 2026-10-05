@@ -130,8 +130,12 @@ async function init(root) {
     dispatchEvent(new Event('refit'));
   }
 
+  // On phones the box shrinks to the pages instead of leaving grey space around them, and keeps that height when zooming; desktop and
+  // fullscreen keep the height the layout gives them.
+  const fixedH = () => !document.documentElement.classList.contains('desk') && !document.fullscreenElement;
+
   const scaleFor = (p) => {
-    const h = scroller.clientHeight - 16;
+    const h = (fixedH() ? innerHeight * 0.75 : scroller.clientHeight) - 16;
     const w = scroller.clientWidth - 16;
     return Math.min(h / p.vp.height, w / p.vp.width) * ZOOMS[zi];
   };
@@ -142,6 +146,9 @@ async function init(root) {
       p.wrap.style.width = `${p.vp.width * s}px`;
       p.wrap.style.height = `${p.vp.height * s}px`;
     });
+    scroller.style.height = fixedH()
+      ? `${Math.min(innerHeight * 0.75, Math.max(...pages.map((p) => p.vp.height * (scaleFor(p) / ZOOMS[zi]))))}px`
+      : '';
   };
 
   const draw = async (p) => {
