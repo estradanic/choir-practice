@@ -105,6 +105,13 @@ async function init(root) {
     fill.style.width = `${Math.floor((room * p) / 100 / 12) * 12}px`;
   };
   setPct(0);
+  const fixedH = () => !document.documentElement.classList.contains('desk') && !document.fullscreenElement;
+  // Until the PDF is read, assume US Letter so the phone box isn't taller than the page will be.
+  if (fixedH()) {
+    const lw = 612, lh = 792;
+    const s = Math.min((innerHeight * 0.75 - 16) / lh, (scroller.clientWidth - 16) / lw);
+    scroller.style.height = `${Math.min(innerHeight * 0.75, lh * s)}px`;
+  }
   const pdfjs = await load();
   setPct(20);
   const task = pdfjs.getDocument({ url: root.dataset.src });
@@ -132,7 +139,6 @@ async function init(root) {
 
   // On phones the box shrinks to the pages instead of leaving grey space around them, and keeps that height when zooming; desktop and
   // fullscreen keep the height the layout gives them.
-  const fixedH = () => !document.documentElement.classList.contains('desk') && !document.fullscreenElement;
 
   const scaleFor = (p) => {
     const h = (fixedH() ? innerHeight * 0.75 : scroller.clientHeight) - 16;
