@@ -1,5 +1,6 @@
 // Media (audio, video, PDF) kept in IndexedDB so return visits skip the download. Entries carry
-// the site's videoVersion; when it changes, everything stored under an older one is dropped.
+// the site's mediaVersion (window.__cpver); when it changes, everything stored under an older one
+// is dropped. Keys are the full URL, including the ?v= the page puts on MP3/PDF links.
 const ver = String(window.__cpver ?? '');
 let dbp;
 const db = () => (dbp ||= new Promise((res) => {

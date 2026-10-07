@@ -1,0 +1,13 @@
+[Unit]
+Description=Choir practice score import pipeline
+After=network-online.target
+
+[Service]
+WorkingDirectory=%h/Development/choir-practice
+Environment=PATH=%h/.local/bin:%h/.opencode/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=%h/Development/choir-practice/pipeline/watch.sh
+Restart=on-failure
+KillMode=process
+
+[Install]
+WantedBy=default.target

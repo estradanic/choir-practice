@@ -1,4 +1,5 @@
 import { getCached, putCached } from './mediacache.js';
+import { withVer } from '../lib/media.js';
 import workerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url';
 
 let lib;
@@ -96,7 +97,9 @@ async function init(root) {
   }
   const pdfjs = await load();
   setPct(20);
-  const src = root.dataset.src;
+  // The page hands over a ?v=<mediaVersion> PDF URL (withVer is idempotent); the same string is
+  // used for pdf.js, for the fetch that stores it, and as the IndexedDB key.
+  const src = withVer(root.dataset.src);
   const hit = await getCached(src);
   const task = pdfjs.getDocument(hit ? { data: await hit.arrayBuffer() } : { url: src });
   if (!hit) fetch(src).then((r) => r.blob()).then((b) => putCached(src, b)).catch(() => {});

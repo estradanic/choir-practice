@@ -1,10 +1,14 @@
 ---
+import { withVer } from '../lib/media.js';
 const { kind, src, slow } = Astro.props;
+// MP3 URLs arrive versioned (?v=<mediaVersion>); withVer leaves an already-versioned URL alone,
+// so the src the element loads is exactly the key mediacache.js stores it under.
+const url = kind === 'video' ? src : withVer(src);
 ---
 <div class="player" data-slow={slow ? JSON.stringify(slow) : undefined}>
   {kind === 'video'
-    ? <video class="video" playsinline preload="auto" src={src}></video>
-    : <audio preload="auto" src={src}></audio>}
+    ? <video class="video" playsinline preload="auto" src={url}></video>
+    : <audio preload="auto" src={url}></audio>}
   <div class="controls">
     <button type="button" class="pp" aria-label="Play" data-state="paused"></button>
     <input type="range" class="seek" min="0" max="1000" value="0" step="1" aria-label="Seek" />

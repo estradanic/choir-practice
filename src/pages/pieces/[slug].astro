@@ -2,6 +2,7 @@
 import Layout from '../../layouts/Layout.astro';
 import Player from '../../components/Player.astro';
 import { getPieces } from '../../lib/pieces.js';
+import { withVer } from '../../lib/media.js';
 import site from '../../../site.json';
 export function getStaticPaths() {
   return getPieces().map((p) => ({ params: { slug: p.slug }, props: { piece: p } }));
@@ -19,11 +20,13 @@ const prev = sibs[si - 1];
 const next = sibs[si + 1];
 // Scores are always US Letter, so the layout doesn't need to wait for the PDF to load.
 const pa = piece.tracks.some((t) => t.pdf) ? 8.5 / 11 : null;
-const file = (f) => `${base}/pieces/${piece.slug}/${f}`;
+// MP3/PDF URLs get ?v=<mediaVersion>; everything downstream (Player, pdfview, the audio
+// engine, download links) uses this one string, so it doubles as the cache key.
+const file = (f) => withVer(`${base}/pieces/${piece.slug}/${f}`);
 const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries(t.slow).map(([k, v]) => [k, file(v)]))) : undefined);
 ---
 <Layout title={piece.title} wide bar={piece.set ? 'set' : true}>
-  <script is:inline define:vars={{ ver: site.videoVersion }}>window.__cpver = ver;</script>
+  <script is:inline define:vars={{ ver: site.mediaVersion }}>window.__cpver = ver;</script>
   {pa && <script is:inline define:vars={{ pa }}>document.documentElement.style.setProperty('--pa', pa); window.__paSet = true;</script>}
   <div class="taskbar">
     <a class="btn start" href={`${base}/`} title="Back to all pieces">All pieces</a>
@@ -136,6 +139,7 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
 <script>
   import '../../scripts/pdfview.js';
   import { fetchBytes, cacheVideos } from '../../scripts/mediacache.js';
+  import { withVer } from '../../lib/media.js';
   document.addEventListener('click', (e) => {
     const b = e.target.closest?.('.min');
     if (!b) return;
@@ -341,7 +345,7 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
     const vp = v.closest('.player');
     const urls = {};
     tabs.forEach((t) => {
-      if (t.dataset.audio) urls[t.dataset.tab] = { 1: t.dataset.audio, ...(t.dataset.slow ? JSON.parse(t.dataset.slow) : {}) };
+      if (t.dataset.audio) urls[t.dataset.tab] = { 1: withVer(t.dataset.audio), ...(t.dataset.slow ? JSON.parse(t.dataset.slow) : {}) };
     });
     const keys = Object.keys(urls);
     let active = tabs[0].dataset.tab;

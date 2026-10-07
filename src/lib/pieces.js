@@ -4,8 +4,9 @@ import path from 'node:path';
 const root = path.resolve('public/pieces');
 const site = JSON.parse(fs.readFileSync('site.json', 'utf8'));
 const videoBase = site.videoBase.replace(/\/$/, '');
-// Bump videoVersion in site.json after re-uploading videos, to bypass browsers' long-lived cache.
-const ver = site.videoVersion ? `?v=${site.videoVersion}` : '';
+// Bump mediaVersion in site.json after re-uploading media (videos, MP3s, PDF), to bypass
+// browsers' long-lived cache. MP3/PDF URLs are versioned by src/lib/media.js.
+const ver = site.mediaVersion ? `?v=${site.mediaVersion}` : '';
 // Fallback for pieces whose piece.json has no "parts" (export.py records the score's
 // staff order there, which is what normally drives the track order).
 const order = ['soprano', 'alto', 'tenor', 'baritone', 'bass'];

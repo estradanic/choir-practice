@@ -8,6 +8,8 @@ user-invocable: true
 
 Input: path to an `.mscz` file (ask if not given). Keep it token-cheap: run the commands, don't read the generated files.
 
+If the prompt says PIPELINE MODE, read `pipeline/PIPELINE.md` first: it replaces the question tool with email and the git steps with `pipeline/gitpush.sh`.
+
 ## Steps
 
 1. **Gather info**: take everything the user already stated in their request (title, composer, set, tags, part layout) as final. **Only ask about what they did not say**, in one question call, and skip the call entirely if nothing is missing. Fields: title, composer, set name (optional, plus position in the set), tags, and **anything non-standard about the parts** — anything that is not standard SATB.
@@ -31,7 +33,7 @@ Input: path to an `.mscz` file (ask if not given). Keep it token-cheap: run the 
    - `python3 .claude/skills/new-score/render_video.py "<score.mscz>" public/pieces/<slug> video-out/<slug>` → `full.mp4` + `<part>.mp4`. It draws an 850x1100 US Letter page with a thin cursor via our fork `estradanic/mscz-to-video`, pinned to a commit in the script (fetched into gitignored `tools/` on first run; never track upstream, so it can't change under us), once, then muxes each MP3 onto it. No intro, so the picture lines up with the MP3s from 0. Takes ~4 min for a 4 min piece (uses up to 8 cores); run it with a long timeout. `--seconds N` renders just the start for a quick look.
    - `.claude/skills/new-score/upload_videos.sh <slug>` → uploads to the Cloudflare R2 bucket (needs rclone + `.env`, see `.env.example`; if missing, tell the user to follow README setup). The script passes `--s3-no-check-bucket`; without it every upload dies with `CreateBucket … 403 AccessDenied`, because R2 forbids bucket creation to a token scoped to that bucket.
    - In `piece.json` set `"videos": ["full", "soprano", ...]` (the tracks uploaded). URLs are derived as `<site.json videoBase>/<slug>/<track>.mp4`. Only list tracks that actually uploaded, otherwise the tabs 404.
-   - Uploaded videos are cached by browsers for a year. If you **re-upload** videos for an existing piece, bump `videoVersion` in `site.json` so everyone's browser fetches the new files.
+   - Uploaded videos are cached by browsers for a year. If you **re-upload** media for an existing piece (videos, MP3s, PDF), bump `mediaVersion` in `site.json` so everyone's browser fetches the new files — it versions the video URLs (`videoBase`) and the `?v=` on every MP3/PDF link.
 6. **Verify**: `npm run build`; confirm it passes.
 7. **Offer to commit and push** (`git add public/pieces/<slug>`; message "Add <title>"). Include any supporting changes made along the way (e.g. `.gitignore`, `scripts/new-piece.mjs`, `src/lib/pieces.js`, this skill). The GitHub Action deploys it.
 
@@ -42,7 +44,7 @@ When the piece is already on the site and only its media is stale (the `.mscz` w
 1. Export into the existing folder — it overwrites the PDF and MP3s in place: `python3 .claude/skills/new-score/export.py "<file.mscz>" public/pieces/<slug>`.
 2. `python3 .claude/skills/new-score/slow_audio.py public/pieces/<slug> --force`. The `--force` matters: without it the slowed copies of the *old* MP3s are left in place and the speed buttons play a different performance than the main one.
 3. Compare the parts `export.py` printed against the files already in the folder. Deleted parts need their stale `.mp3` and `speeds/*/<part>.mp3` removed, or they keep shipping dead weight; then prune `parts`/`videos` in `piece.json` and re-run the export so `parts` matches again.
-4. Re-render and re-upload the videos (step 5) and bump `videoVersion` in `site.json`.
+4. Re-render and re-upload the videos (step 5) and bump `mediaVersion` in `site.json` — a re-export replaces the MP3s/PDF too, and that is what busts their `?v=` URLs.
 5. `npm run build`, then commit as "Update media for <title>", not "Add <title>".
 
 ## Notes
