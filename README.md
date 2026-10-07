@@ -12,7 +12,7 @@ Static Astro site. Add pieces with `/new-score`. Audio and PDFs live in `public/
 Drop a `.mscz` into `scores/` and it is imported automatically.
 
 - A systemd user service (`pipeline/choir-scores.service`) polls `scores/`, moves each file to `scores/in-progress/` and starts one `opencode run -m opencode/big-pickle --auto` session per file, running the `/new-score` skill in pipeline mode (`pipeline/PIPELINE.md`).
-- If a piece with the same title, composer and part count exists, its PDF, audio and videos are regenerated and `mediaVersion` in `site.json` is bumped. Otherwise the agent guesses the metadata and emails you one question (set, tags, unusual parts); reply to that email.
+- The agent gets fuzzy "candidate" matches against existing pieces and decides. If it is clearly the same piece, its PDF, audio and videos are regenerated and `mediaVersion` in `site.json` is bumped. Otherwise the agent guesses the metadata and emails you one question (set, tags, unusual parts); reply to that email.
 - Each job commits and pushes only its own piece folder (`pipeline/gitpush.sh`). Finished scores go to `scores/complete/`, failures to `scores/failed/`; logs are in `scores/logs/`. You get an email either way.
 - Heavy steps (export, video render) share a lock, so several scores run one at a time.
 

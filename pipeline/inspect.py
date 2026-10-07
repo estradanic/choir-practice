@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Guess metadata from an .mscz and find an existing piece with the same title, composer and part count.
+"""Guess metadata from an .mscz and list existing pieces that look similar (fuzzy candidates).
 Usage: inspect.py <file.mscz>  -> JSON on stdout."""
 import glob, json, os, re, sys, unicodedata, zipfile
 import xml.etree.ElementTree as ET
@@ -14,9 +14,19 @@ tags = {m.get('name'): (m.text or '').strip() for m in root.iter('metaTag')}
 title = tags.get('workTitle') or next((t.text for t in root.iter('text') if t.text), '') or os.path.basename(sys.argv[1])[:-5]
 composer = tags.get('composer', '')
 parts = [(p.find('trackName').text if p.find('trackName') is not None else '') for p in root.iter('Part') if p.findall('Staff')]
-match = None
+from difflib import SequenceMatcher
+def sim(a, b):
+    a, b = norm(a), norm(b)
+    if not a or not b: return 0
+    return max(SequenceMatcher(None, a, b).ratio(), 0.9 if a in b or b in a else 0)
+cands = []
 for f in glob.glob('public/pieces/*/piece.json'):
     m = json.load(open(f))
-    if norm(m.get('title')) == norm(title) and norm(m.get('composer')) == norm(composer) and len(m.get('parts', [])) == len(parts):
-        match = os.path.basename(os.path.dirname(f)); break
-print(json.dumps({'title': title, 'composer': composer, 'parts': parts, 'existing': match}, indent=1))
+    t, c = sim(m.get('title'), title), sim(m.get('composer'), composer)
+    score = round(0.6 * t + 0.4 * c, 2)
+    if score >= 0.5:
+        cands.append({'slug': os.path.basename(os.path.dirname(f)), 'title': m.get('title'), 'composer': m.get('composer'),
+                      'parts': len(m.get('parts', [])), 'partsMatch': len(m.get('parts', [])) == len(parts),
+                      'titleSim': round(t, 2), 'composerSim': round(c, 2), 'score': score})
+cands.sort(key=lambda c: -c['score'])
+print(json.dumps({'title': title, 'composer': composer, 'parts': parts, 'candidates': cands[:5]}, indent=1))
