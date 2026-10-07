@@ -14,6 +14,11 @@ const { kind, src, slow } = Astro.props;
       <span class="time sv">1×</span>
       <button type="button" data-spd="1" aria-label="Faster">+</button>
     </span>
+    {kind === 'video' && <span class="speed dly" role="group" aria-label="Audio delay calibration" title="Video delay, for Bluetooth audio: raise until picture and sound line up" hidden>
+      <button type="button" data-dly="-1" aria-label="Less delay">–</button>
+      <span class="time sv dv">0 ms</span>
+      <button type="button" data-dly="1" aria-label="More delay">+</button>
+    </span>}
     {kind === 'video' && <button type="button" class="fs" aria-label="Fullscreen"></button>}
   </div>
   <slot />

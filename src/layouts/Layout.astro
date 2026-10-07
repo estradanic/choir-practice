@@ -104,6 +104,8 @@ const { title, wide, bar } = Astro.props;
       .speed button:active { padding: 4px 0 2px; }
       .speed button:disabled { color: var(--mid); text-shadow: 1px 1px var(--hi); cursor: default; }
       .speed button:disabled:active { padding: 3px 0; }
+      .dly[hidden] { display: none; }
+      .dly .sv { min-width: 4.5em; }
       .sv { min-width: 3em; text-align: center; }
       .time { flex: none; font-variant-numeric: tabular-nums; padding: 3px 6px; background: #fff; box-shadow: var(--sunken); font-size: 0.9rem; }
       .seek, .mv { flex: 1 1 70px; min-width: 0; height: 22px; margin: 0; background: transparent; -webkit-appearance: none; appearance: none; cursor: pointer; }
@@ -157,14 +159,14 @@ const { title, wide, bar } = Astro.props;
       .pdfview:fullscreen .pwrap .pages { flex: 1; }
       /* Win95-style scrollbar */
       /* The dot tile is rebuilt by pdfview.js to match the screen's pixel ratio, so the dots stay evenly spaced at 125%/150% scaling. */
-      .wsb { display: flex; background: #e8e6e0; image-rendering: pixelated; }
+      .wsb { touch-action: none; user-select: none; -webkit-user-select: none; display: flex; background: #e8e6e0; image-rendering: pixelated; }
       .wsb-v[hidden] { display: none; }
       .wsb-h[hidden] { visibility: hidden; }
       .wsb-ph { height: 19px; }
       .wsb-h { height: 16px; margin-top: 3px; }
       .wsb-v { position: absolute; right: 0; top: 0; bottom: 0; width: 16px; flex-direction: column; }
       .wsb-t { position: relative; flex: 1; min-width: 0; min-height: 0; }
-      .wsb-th { position: absolute; background: var(--face); box-shadow: var(--raised); touch-action: none; }
+      .wsb-th { position: absolute; min-width: 16px; background: var(--face); box-shadow: var(--raised); touch-action: none; }
       .wsb-h .wsb-th { top: 0; bottom: 0; }
       .wsb-v .wsb-th { left: 0; right: 0; }
       .wsb-a { position: relative; flex: none; width: 16px; height: 16px; padding: 0; touch-action: none; }

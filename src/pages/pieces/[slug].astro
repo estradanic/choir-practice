@@ -2,6 +2,7 @@
 import Layout from '../../layouts/Layout.astro';
 import Player from '../../components/Player.astro';
 import { getPieces } from '../../lib/pieces.js';
+import site from '../../../site.json';
 export function getStaticPaths() {
   return getPieces().map((p) => ({ params: { slug: p.slug }, props: { piece: p } }));
 }
@@ -22,6 +23,7 @@ const file = (f) => `${base}/pieces/${piece.slug}/${f}`;
 const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries(t.slow).map(([k, v]) => [k, file(v)]))) : undefined);
 ---
 <Layout title={piece.title} wide bar={piece.set ? 'set' : true}>
+  <script is:inline define:vars={{ ver: site.videoVersion }}>window.__cpver = ver;</script>
   {pa && <script is:inline define:vars={{ pa }}>document.documentElement.style.setProperty('--pa', pa); window.__paSet = true;</script>}
   <div class="taskbar">
     <a class="btn start" href={`${base}/`} title="Back to all pieces">All pieces</a>
@@ -133,6 +135,7 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
 </Layout>
 <script>
   import '../../scripts/pdfview.js';
+  import { fetchBytes, cacheVideos } from '../../scripts/mediacache.js';
   document.addEventListener('click', (e) => {
     const b = e.target.closest?.('.min');
     if (!b) return;
@@ -293,6 +296,7 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
   fit();
   if (!document.querySelector('.score') || window.__paSet) reveal();
   else setTimeout(reveal, 2500);
+  await cacheVideos();
   const tabs = document.querySelectorAll('[data-tab]');
   const panels = document.querySelectorAll('[data-panel]');
   // Audio syncs with audio and video with video, never across kinds.
@@ -323,10 +327,10 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
   let applyMix = () => {};
   // The chosen part (or Custom mix) is remembered for the browser session, so the next piece opens the same way.
   let mixState = {};
-  try { mixState = JSON.parse(sessionStorage.getItem('cpmix')) || {}; } catch {}
+  try { mixState = JSON.parse(localStorage.getItem('cpmix')) || {}; } catch {}
   mixState = { sel: mixState.sel || '', vols: mixState.vols || {}, on: mixState.on || {} };
   const DEFVOL = 0.75;
-  const saveMix = () => { try { sessionStorage.setItem('cpmix', JSON.stringify(mixState)); } catch {} };
+  const saveMix = () => { try { localStorage.setItem('cpmix', JSON.stringify(mixState)); } catch {} };
   const dlVideo = document.getElementById('dl-video');
   const dlAudio = document.getElementById('dl-audio');
   let tabBlock = () => '';
@@ -365,9 +369,9 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
       const TAU = 0.04;
       // Debug recorder (turn on with ?debug, off with ?debug=0): a timestamped event and
       // sample log with a button to copy it, so a bad session can be inspected afterwards.
-      if (location.search.includes('debug=0')) sessionStorage.removeItem('cpdebug');
-      else if (location.search.includes('debug')) sessionStorage.setItem('cpdebug', '1');
-      const debug = sessionStorage.getItem('cpdebug') === '1';
+      if (location.search.includes('debug=0')) localStorage.removeItem('cpdebug');
+      else if (location.search.includes('debug')) localStorage.setItem('cpdebug', '1');
+      const debug = localStorage.getItem('cpdebug') === '1';
       const T0 = performance.now();
       const logs = [];
       const log = (...a) => {
@@ -461,8 +465,7 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
       const idxv = {};
       const index = (s, k) => {
         const id = `${s}/${k}`;
-        return (idx[id] ||= fetch(info(s, k).url)
-          .then((r) => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
+        return (idx[id] ||= fetchBytes(info(s, k).url)
           .then((ab) => (idxv[id] = parse(ab)))
           .catch((e) => { delete idx[id]; throw e; }));
       };
@@ -560,8 +563,31 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
       };
       // Browsers don't report Bluetooth delay, so aim for the sound to lead the picture slightly:
       // about right for wired/speakers and tolerable on Bluetooth.
-      const BIAS = 0.05;
+      const BASE = 0.05;
+      let userDly = 0;
+      try { userDly = Math.max(0, Math.min(0.6, Number(localStorage.getItem('cpdelay')) || 0)); } catch {}
+      let BIAS = BASE + userDly;
       const heard = () => posAt(ctx.currentTime - lat) - BIAS;
+      const dly = document.querySelector('.dly');
+      if (dly) {
+        dly.hidden = false;
+        const dv = dly.querySelector('.dv');
+        const [dm, dp] = dly.querySelectorAll('[data-dly]');
+        const showD = () => {
+          dv.textContent = `${Math.round(userDly * 1000)} ms`;
+          dm.disabled = userDly <= 0.0001;
+          dp.disabled = userDly >= 0.5999;
+        };
+        const stepD = (d) => {
+          userDly = Math.round((userDly + d * 0.025) * 1000) / 1000;
+          BIAS = BASE + userDly;
+          try { localStorage.setItem('cpdelay', String(userDly)); } catch {}
+          showD();
+        };
+        dm.addEventListener('click', () => stepD(-1));
+        dp.addEventListener('click', () => stepD(1));
+        showD();
+      }
       const stopVoice = (vo, at = ctx.currentTime) => {
         vo.done = true;
         vo.g.gain.cancelScheduledValues(at);
