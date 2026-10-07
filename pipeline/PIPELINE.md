@@ -8,3 +8,4 @@ Unattended: the user is not at the keyboard. Never use the question tool. Never 
 - Run heavy steps (export.py, slow_audio.py, render_video.py) under `flock /tmp/choir-heavy.lock <command>`. Use long timeouts.
 - Commit with `pipeline/gitpush.sh <slug> "Add <title>"` (new) or `pipeline/gitpush.sh <slug> "Update media for <title>" --bump` (update). Never use plain git add/commit/push; other work is in progress in the tree.
 - Don't move the score file; the pipeline does that. Exit non-zero (fail loudly) if anything fails.
+- NEVER edit `site.json` yourself (ignore the manual mediaVersion bump in the skill): `gitpush.sh --bump` does it, under the lock, so parallel jobs don't clash.

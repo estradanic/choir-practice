@@ -18,7 +18,7 @@ def body(m):
     t = p.get_content() if p else ''
     out = []
     for l in t.splitlines():
-        if l.startswith('>') or re.match(r'^On .* wrote:$', l.strip()): break
+        if l.startswith('>') or l.startswith('-----') or re.match(r'^On .* wrote:$', l.strip()): break
         out.append(l)
     return '\n'.join(out).strip()
 
