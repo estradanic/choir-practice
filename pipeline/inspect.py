@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Guess metadata from an .mscz and find an existing piece with the same title, composer and part count.
 Usage: inspect.py <file.mscz>  -> JSON on stdout."""
-import glob, json, os, re, sys, zipfile
+import glob, json, os, re, sys, unicodedata, zipfile
 import xml.etree.ElementTree as ET
 
-def norm(s): return re.sub(r'[^a-z0-9]+', '', (s or '').lower())
+def norm(s):
+    s = unicodedata.normalize('NFKD', s or '')
+    return re.sub(r'[^a-z0-9]+', '', ''.join(c for c in s if not unicodedata.combining(c)).lower())
 
 z = zipfile.ZipFile(sys.argv[1])
 root = ET.fromstring(z.read(next(n for n in z.namelist() if n.endswith('.mscx'))))
