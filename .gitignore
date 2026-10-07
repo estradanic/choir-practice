@@ -6,3 +6,4 @@ scores
 video-out
 .env
 tools
+pipeline/__pycache__/
