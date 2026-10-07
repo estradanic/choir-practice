@@ -36,6 +36,7 @@ def main(piece, question, notify_only=False):
     if notify_only: return ''
     deadline = time.time() + 7 * 86400
     seen = set()
+    remind = time.time() + 4 * 3600
     while time.time() < deadline:
         try:
             im = imaplib.IMAP4('127.0.0.1', 1143); im.starttls(ctx); im.login(e['MAIL_USER'], e['MAIL_BRIDGE_PASSWORD'])
@@ -54,6 +55,16 @@ def main(piece, question, notify_only=False):
             im.logout()
         except Exception as ex:
             print('imap retry:', ex, file=sys.stderr)
+        if time.time() > remind:
+            remind = time.time() + 4 * 3600
+            try:
+                r = EmailMessage(); r['From'], r['To'] = msg['From'], msg['To']
+                r['Subject'] = f'Reminder {tag} still waiting for your reply'
+                r.set_content('Still waiting on your reply to:\n\n' + question)
+                with smtplib.SMTP('127.0.0.1', 1025) as s2:
+                    s2.starttls(context=ctx); s2.login(e['MAIL_USER'], e['MAIL_BRIDGE_PASSWORD']); s2.send_message(r)
+            except Exception as ex:
+                print('reminder failed:', ex, file=sys.stderr)
         time.sleep(20)
     sys.exit('timed out waiting for reply')
 
