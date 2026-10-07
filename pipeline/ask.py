@@ -40,12 +40,13 @@ def main(piece, question, notify_only=False):
         try:
             im = imaplib.IMAP4('127.0.0.1', 1143); im.starttls(ctx); im.login(e['MAIL_USER'], e['MAIL_BRIDGE_PASSWORD'])
             im.select('INBOX')
-            _, ids = im.search(None, 'SUBJECT', f'"{tag}"')
+            _, ids = im.search(None, 'SUBJECT', '"choir:"')
             for i in ids[0].split():
                 if i in seen: continue
                 seen.add(i)
                 _, d = im.fetch(i, '(RFC822)')
                 m = email.message_from_bytes(d[0][1], policy=email.policy.default)
+                if tag not in str(m['Subject']): continue
                 if mid in (m.get('In-Reply-To') or '') + (m.get('References') or '') or (
                         m['Subject'].lower().startswith('re:') and tag in m['Subject'] and m['Message-ID'] != mid):
                     r = body(m)
