@@ -8,11 +8,15 @@
   ],
   "videos": [
     "full",
-    "women",
-    "men"
+    "soprano",
+    "alto",
+    "tenor",
+    "bass"
   ],
   "parts": [
-    "women",
-    "men"
+    "soprano",
+    "alto",
+    "tenor",
+    "bass"
   ]
 }
