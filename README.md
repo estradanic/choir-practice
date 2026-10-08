@@ -16,7 +16,7 @@ Drop a `.mscz` into `scores/` and it is imported automatically.
 - Each job commits and pushes only its own piece folder (`pipeline/gitpush.sh`). Finished scores go to `scores/complete/`, failures to `scores/failed/`; logs are in `scores/logs/`. You get an email either way.
 - Heavy steps (export, video render) share a lock, so several scores run one at a time.
 
-Setup: add `MAIL_USER`, `MAIL_BRIDGE_PASSWORD` and `MAIL_TO` to `.env` (Proton Mail Bridge must be running, IMAP 1143 / SMTP 1025; `MAIL_TO` must be a real mailbox, not a SimpleLogin alias), then:
+Setup: add `MAIL_USER`, `MAIL_BRIDGE_PASSWORD` and `MAIL_TO` to `.env` (default: Proton Mail Bridge running, IMAP 1143 / SMTP 1025. For another provider such as Gmail with an app password, also set `MAIL_SMTP_HOST`/`MAIL_SMTP_PORT` (465 = SSL) and `MAIL_IMAP_HOST`/`MAIL_IMAP_PORT` (993 = SSL). `MAIL_TO` is where questions are sent; replies must reach the `MAIL_USER` inbox), then:
 
 ```
 cp pipeline/choir-scores.service ~/.config/systemd/user/
