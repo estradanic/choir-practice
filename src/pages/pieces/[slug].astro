@@ -736,11 +736,35 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
         lat = readLat();
         log('begin', 'v', v.currentTime.toFixed(2), 'lat', lat.toFixed(3));
         t0 = ctx.currentTime + LEAD;
-        m0 = v.currentTime + (LEAD + lat) * sp + BIAS;
+        const v0 = v.currentTime;
+        m0 = v0 + (LEAD + lat) * sp + BIAS;
+        // Near the start the audio would have to begin before 0 to lead the picture, which cuts off
+        // the first notes. Start the audio from 0 instead and hold the video back until it catches up.
+        const hold = v0 < BIAS + 0.05 && !hasHeld;
+        if (hold) {
+          m0 = (LEAD + lat) * sp;
+          holding = true;
+          v.pause();
+        }
         playing = true;
         mount();
+        if (hold) {
+          clearTimeout(holdTimer);
+          const e = epoch;
+          holdTimer = setTimeout(() => {
+            holding = false;
+            if (e !== epoch) { halt(); return; }
+            hasHeld = true;
+            v.play().catch(() => {}).finally(() => { hasHeld = false; });
+          }, Math.max(0, (t0 + lat + (v0 + BIAS) / sp - ctx.currentTime) * 1000));
+        }
       };
+      let holding = false;
+      let hasHeld = false;
+      let holdTimer = 0;
       const halt = () => {
+        if (holding) return;
+        clearTimeout(holdTimer);
         log('halt');
         epoch++;
         playing = false;

@@ -37,6 +37,8 @@ If the prompt says PIPELINE MODE, read `pipeline/PIPELINE.md` first: it replaces
 6. **Verify**: `npm run build`; confirm it passes.
 7. **Offer to commit and push** (`git add public/pieces/<slug>`; message "Add <title>"). Include any supporting changes made along the way (e.g. `.gitignore`, `scripts/new-piece.mjs`, `src/lib/pieces.js`, this skill). The GitHub Action deploys it.
 
+   - **Closed scores** (SATB written as two staves with two voices each, so the parts show up as e.g. Women/Men): pass one `--voices` group per staff, in score order: `export.py <file> <dir> --voices "soprano,alto" --voices "tenor,bass"`. A single-name group (`--voices "bass"`) means the whole staff. Without the flag you get one part per staff and the parts are named after the staves, which is wrong for a choir. Always check the printed parts against what the user said.
+
 ## Regenerating an existing piece
 
 When the piece is already on the site and only its media is stale (the `.mscz` was edited), skip steps 1, 2 and 4. Don't re-run `npm run new-piece`, and don't touch `title`, `composer`, `set`, `setOrder` or `tags`: the existing `piece.json` is the record of what the piece is, and `export.py` only ever rewrites `parts` in it.
