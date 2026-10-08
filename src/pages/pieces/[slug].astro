@@ -373,9 +373,10 @@ const slowOf = (t) => (t.slow ? JSON.stringify(Object.fromEntries(Object.entries
       const TAU = 0.04;
       // Debug recorder (turn on with ?debug, off with ?debug=0): a timestamped event and
       // sample log with a button to copy it, so a bad session can be inspected afterwards.
-      if (location.search.includes('debug=0')) localStorage.removeItem('cpdebug');
-      else if (location.search.includes('debug')) localStorage.setItem('cpdebug', '1');
-      const debug = localStorage.getItem('cpdebug') === '1';
+      try { localStorage.removeItem('cpdebug'); } catch {}
+      if (location.search.includes('debug=0')) sessionStorage.removeItem('cpdebug');
+      else if (location.search.includes('debug')) sessionStorage.setItem('cpdebug', '1');
+      const debug = sessionStorage.getItem('cpdebug') === '1';
       const T0 = performance.now();
       const logs = [];
       const log = (...a) => {
